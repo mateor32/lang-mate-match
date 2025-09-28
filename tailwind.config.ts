@@ -57,6 +57,23 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Language Exchange Theme Colors
+        like: "hsl(var(--like-color))",
+        dislike: "hsl(var(--dislike-color))",
+        match: "hsl(var(--match-color))",
+      },
+      backgroundImage: {
+        "gradient-primary": "var(--gradient-primary)",
+        "gradient-accent": "var(--gradient-accent)",
+        "gradient-background": "var(--gradient-background)",
+      },
+      boxShadow: {
+        "card": "var(--shadow-card)",
+        "elevated": "var(--shadow-elevated)",
+      },
+      transitionTimingFunction: {
+        "smooth": "var(--transition-smooth)",
+        "bounce": "var(--transition-bounce)",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -80,10 +97,49 @@ export default {
             height: "0",
           },
         },
+        "swipe-right": {
+          from: {
+            transform: "translateX(0) rotate(0deg)",
+            opacity: "1",
+          },
+          to: {
+            transform: "translateX(300px) rotate(30deg)",
+            opacity: "0",
+          },
+        },
+        "swipe-left": {
+          from: {
+            transform: "translateX(0) rotate(0deg)",
+            opacity: "1",
+          },
+          to: {
+            transform: "translateX(-300px) rotate(-30deg)",
+            opacity: "0",
+          },
+        },
+        "bounce-in": {
+          "0%": {
+            transform: "scale(0.3)",
+            opacity: "0",
+          },
+          "50%": {
+            transform: "scale(1.05)",
+          },
+          "70%": {
+            transform: "scale(0.9)",
+          },
+          "100%": {
+            transform: "scale(1)",
+            opacity: "1",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "swipe-right": "swipe-right 0.5s ease-out forwards",
+        "swipe-left": "swipe-left 0.5s ease-out forwards",
+        "bounce-in": "bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
       },
     },
   },

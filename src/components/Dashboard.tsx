@@ -3,9 +3,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Settings, Users, MessageCircle } from "lucide-react";
+import { LogOut, Settings, Users, MessageCircle, Heart, Search } from "lucide-react";
 import UserCard from "./UserCard";
 import MatchModal from "./MatchModal";
+import ChatList from "./ChatList";
+import ChatWindow from "./ChatWindow";
 
 // Mock data
 const currentUser = {
@@ -56,11 +58,15 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
+type ViewType = "discover" | "matches" | "chat";
+
 const Dashboard = ({ onLogout }: DashboardProps) => {
   const [currentUserIndex, setCurrentUserIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [matchedUser, setMatchedUser] = useState<typeof mockUsers[0] | null>(null);
   const [matches, setMatches] = useState<typeof mockUsers>([]);
+  const [currentView, setCurrentView] = useState<ViewType>("discover");
+  const [selectedChatUser, setSelectedChatUser] = useState<typeof mockUsers[0] | null>(null);
 
   const currentCardUser = mockUsers[currentUserIndex];
 
@@ -94,6 +100,34 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
     setMatchedUser(null);
   };
 
+  const handleViewMatches = () => {
+    setCurrentView("matches");
+  };
+
+  const handleBackToDiscover = () => {
+    setCurrentView("discover");
+    setSelectedChatUser(null);
+  };
+
+  const handleSelectChat = (user: typeof mockUsers[0]) => {
+    setSelectedChatUser(user);
+    setCurrentView("chat");
+  };
+
+  const handleBackToMatches = () => {
+    setSelectedChatUser(null);
+    setCurrentView("matches");
+  };
+
+  // Create mock matches with chat data
+  const mockMatches = matches.map((user, index) => ({
+    user,
+    lastMessage: index === 0 ? "¡Perfecto! Podemos organizar eso." : "That sounds interesting!",
+    lastMessageTime: index === 0 ? "hace 2 min" : "hace 1 h",
+    unreadCount: index === 0 ? 2 : 0,
+    isOnline: index < 2,
+  }));
+
   return (
     <div className="min-h-screen bg-gradient-background">
       {/* Header */}
@@ -118,9 +152,28 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
             </div>
             
             <div className="flex gap-2">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={currentView === "discover" ? "default" : "ghost"} 
+                size="sm"
+                onClick={() => setCurrentView("discover")}
+                className={currentView === "discover" ? "bg-primary text-white" : ""}
+              >
+                <Search className="w-4 h-4" />
+                <span className="hidden sm:inline ml-2">Descubrir</span>
+              </Button>
+              <Button 
+                variant={currentView === "matches" || currentView === "chat" ? "default" : "ghost"} 
+                size="sm"
+                onClick={handleViewMatches}
+                className={`relative ${currentView === "matches" || currentView === "chat" ? "bg-primary text-white" : ""}`}
+              >
                 <MessageCircle className="w-4 h-4" />
-                <span className="hidden sm:inline ml-2">Chats</span>
+                <span className="hidden sm:inline ml-2">Matches</span>
+                {matches.length > 0 && (
+                  <Badge className="absolute -top-1 -right-1 w-5 h-5 text-xs bg-like text-white border-0 p-0 flex items-center justify-center">
+                    {matches.length}
+                  </Badge>
+                )}
               </Button>
               <Button variant="ghost" size="sm">
                 <Settings className="w-4 h-4" />
@@ -135,77 +188,106 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Profile Sidebar */}
-          <div className="lg:col-span-1">
-            <Card className="p-6 sticky top-24">
-              <div className="text-center space-y-4">
-                <Avatar className="w-24 h-24 mx-auto">
-                  <AvatarImage src={currentUser.foto} />
-                  <AvatarFallback className="text-2xl">{currentUser.nombre.charAt(0)}</AvatarFallback>
-                </Avatar>
-                
-                <div>
-                  <h3 className="text-xl font-bold">{currentUser.nombre}</h3>
-                  <p className="text-muted-foreground">{currentUser.email}</p>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-2">Tu idioma</p>
-                    <Badge className="bg-accent/10 text-accent border-accent/20">
-                      {currentUser.idiomaNativo}
-                    </Badge>
-                  </div>
+          {/* Profile Sidebar - Only show on discover view */}
+          {currentView === "discover" && (
+            <div className="lg:col-span-1">
+              <Card className="p-6 sticky top-24">
+                <div className="text-center space-y-4">
+                  <Avatar className="w-24 h-24 mx-auto">
+                    <AvatarImage src={currentUser.foto} />
+                    <AvatarFallback className="text-2xl">{currentUser.nombre.charAt(0)}</AvatarFallback>
+                  </Avatar>
                   
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-2">Quieres aprender</p>
-                    <Badge variant="outline" className="border-primary/20 text-primary">
-                      {currentUser.idiomaAprender}
-                    </Badge>
+                    <h3 className="text-xl font-bold">{currentUser.nombre}</h3>
+                    <p className="text-muted-foreground">{currentUser.email}</p>
                   </div>
-                </div>
 
-                {matches.length > 0 && (
-                  <div className="pt-4 border-t">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                      <Users className="w-4 h-4" />
-                      <span className="text-sm">Matches</span>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Tu idioma</p>
+                      <Badge className="bg-accent/10 text-accent border-accent/20">
+                        {currentUser.idiomaNativo}
+                      </Badge>
                     </div>
-                    <p className="text-2xl font-bold text-primary">{matches.length}</p>
+                    
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Quieres aprender</p>
+                      <Badge variant="outline" className="border-primary/20 text-primary">
+                        {currentUser.idiomaAprender}
+                      </Badge>
+                    </div>
                   </div>
-                )}
-              </div>
-            </Card>
-          </div>
+
+                  {matches.length > 0 && (
+                    <div className="pt-4 border-t space-y-3">
+                      <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                        <Heart className="w-4 h-4" />
+                        <span className="text-sm">Matches</span>
+                      </div>
+                      <p className="text-2xl font-bold text-primary">{matches.length}</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleViewMatches}
+                        className="w-full"
+                      >
+                        Ver matches
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </div>
+          )}
 
           {/* Main Content */}
-          <div className="lg:col-span-2">
+          <div className={`${currentView === "discover" ? "lg:col-span-2" : "lg:col-span-3"}`}>
             <div className="flex justify-center">
-              {currentUserIndex < mockUsers.length ? (
-                <div className={`transition-all duration-500 ${isAnimating ? 'scale-95 opacity-50' : 'scale-100 opacity-100'}`}>
-                  <UserCard
-                    user={currentCardUser}
-                    onLike={handleLike}
-                    onDislike={handleDislike}
-                    isAnimating={isAnimating}
-                  />
-                </div>
-              ) : (
-                <Card className="p-8 text-center max-w-sm">
-                  <div className="space-y-4">
-                    <span className="text-6xl">🎉</span>
-                    <h3 className="text-xl font-bold">¡Has visto todos los perfiles!</h3>
-                    <p className="text-muted-foreground">
-                      Vuelve más tarde para ver nuevos usuarios
-                    </p>
-                    <Button 
-                      onClick={() => setCurrentUserIndex(0)}
-                      className="bg-gradient-primary text-white"
-                    >
-                      Ver de nuevo
-                    </Button>
-                  </div>
-                </Card>
+              {currentView === "discover" && (
+                <>
+                  {currentUserIndex < mockUsers.length ? (
+                    <div className={`transition-all duration-500 ${isAnimating ? 'scale-95 opacity-50' : 'scale-100 opacity-100'}`}>
+                      <UserCard
+                        user={currentCardUser}
+                        onLike={handleLike}
+                        onDislike={handleDislike}
+                        isAnimating={isAnimating}
+                      />
+                    </div>
+                  ) : (
+                    <Card className="p-8 text-center max-w-sm">
+                      <div className="space-y-4">
+                        <span className="text-6xl">🎉</span>
+                        <h3 className="text-xl font-bold">¡Has visto todos los perfiles!</h3>
+                        <p className="text-muted-foreground">
+                          Vuelve más tarde para ver nuevos usuarios
+                        </p>
+                        <Button 
+                          onClick={() => setCurrentUserIndex(0)}
+                          className="bg-gradient-primary text-white"
+                        >
+                          Ver de nuevo
+                        </Button>
+                      </div>
+                    </Card>
+                  )}
+                </>
+              )}
+
+              {currentView === "matches" && (
+                <ChatList
+                  matches={mockMatches}
+                  onBackToDiscover={handleBackToDiscover}
+                  onSelectChat={handleSelectChat}
+                />
+              )}
+
+              {currentView === "chat" && selectedChatUser && (
+                <ChatWindow
+                  user={selectedChatUser}
+                  onBack={handleBackToMatches}
+                />
               )}
             </div>
           </div>

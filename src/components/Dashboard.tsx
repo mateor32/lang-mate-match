@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -8,6 +8,8 @@ import UserCard from "./UserCard";
 import MatchModal from "./MatchModal";
 import ChatList from "./ChatList";
 import ChatWindow from "./ChatWindow";
+import { useAuth } from "@/integrations/supabase/auth";
+import { supabase } from "@/integrations/supabase/client";
 
 // Mock data
 const currentUser = {
@@ -54,13 +56,11 @@ const mockUsers = [
   },
 ];
 
-interface DashboardProps {
-  onLogout: () => void;
-}
-
 type ViewType = "discover" | "matches" | "chat";
 
-const Dashboard = ({ onLogout }: DashboardProps) => {
+const Dashboard = () => {
+  const { user, signOut } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
   const [currentUserIndex, setCurrentUserIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [matchedUser, setMatchedUser] = useState<typeof mockUsers[0] | null>(null);
@@ -68,7 +68,30 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
   const [currentView, setCurrentView] = useState<ViewType>("discover");
   const [selectedChatUser, setSelectedChatUser] = useState<typeof mockUsers[0] | null>(null);
 
+  // Cargar perfil del usuario actual
+  useEffect(() => {
+    if (user) {
+      loadUserProfile();
+    }
+  }, [user]);
+
+  const loadUserProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user?.id)
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
+
   const currentCardUser = mockUsers[currentUserIndex];
+  const displayUser = profile || currentUser;
 
   const handleLike = () => {
     setIsAnimating(true);
@@ -145,10 +168,10 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Avatar className="w-8 h-8">
-                <AvatarImage src={currentUser.foto} />
-                <AvatarFallback>{currentUser.nombre.charAt(0)}</AvatarFallback>
+                <AvatarImage src={displayUser.foto_perfil || displayUser.foto} />
+                <AvatarFallback>{(displayUser.nombre || 'U').charAt(0)}</AvatarFallback>
               </Avatar>
-              <span className="hidden sm:block font-medium">{currentUser.nombre}</span>
+              <span className="hidden sm:block font-medium">{displayUser.nombre}</span>
             </div>
             
             <div className="flex gap-2">
@@ -178,7 +201,7 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
               <Button variant="ghost" size="sm">
                 <Settings className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={onLogout}>
+              <Button variant="ghost" size="sm" onClick={signOut}>
                 <LogOut className="w-4 h-4" />
               </Button>
             </div>
@@ -194,27 +217,27 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
               <Card className="p-6 sticky top-24">
                 <div className="text-center space-y-4">
                   <Avatar className="w-24 h-24 mx-auto">
-                    <AvatarImage src={currentUser.foto} />
-                    <AvatarFallback className="text-2xl">{currentUser.nombre.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={displayUser.foto_perfil || displayUser.foto} />
+                    <AvatarFallback className="text-2xl">{(displayUser.nombre || 'U').charAt(0)}</AvatarFallback>
                   </Avatar>
                   
                   <div>
-                    <h3 className="text-xl font-bold">{currentUser.nombre}</h3>
-                    <p className="text-muted-foreground">{currentUser.email}</p>
+                    <h3 className="text-xl font-bold">{displayUser.nombre}</h3>
+                    <p className="text-muted-foreground">{displayUser.email}</p>
                   </div>
 
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground mb-2">Tu idioma</p>
                       <Badge className="bg-accent/10 text-accent border-accent/20">
-                        {currentUser.idiomaNativo}
+                        {displayUser.idioma_nativo || displayUser.idiomaNativo}
                       </Badge>
                     </div>
                     
                     <div>
                       <p className="text-sm font-medium text-muted-foreground mb-2">Quieres aprender</p>
                       <Badge variant="outline" className="border-primary/20 text-primary">
-                        {currentUser.idiomaAprender}
+                        {displayUser.idioma_aprender || displayUser.idiomaAprender}
                       </Badge>
                     </div>
                   </div>

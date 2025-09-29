@@ -14,7 +14,159 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      likes: {
+        Row: {
+          creado_en: string | null
+          id: string
+          id_usuario_destino: string
+          id_usuario_origen: string
+        }
+        Insert: {
+          creado_en?: string | null
+          id?: string
+          id_usuario_destino: string
+          id_usuario_origen: string
+        }
+        Update: {
+          creado_en?: string | null
+          id?: string
+          id_usuario_destino?: string
+          id_usuario_origen?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "likes_id_usuario_destino_fkey"
+            columns: ["id_usuario_destino"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "likes_id_usuario_origen_fkey"
+            columns: ["id_usuario_origen"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matches: {
+        Row: {
+          creado_en: string | null
+          estado: string | null
+          id: string
+          id_usuario1: string
+          id_usuario2: string
+        }
+        Insert: {
+          creado_en?: string | null
+          estado?: string | null
+          id?: string
+          id_usuario1: string
+          id_usuario2: string
+        }
+        Update: {
+          creado_en?: string | null
+          estado?: string | null
+          id?: string
+          id_usuario1?: string
+          id_usuario2?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matches_id_usuario1_fkey"
+            columns: ["id_usuario1"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_id_usuario2_fkey"
+            columns: ["id_usuario2"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mensajes: {
+        Row: {
+          contenido: string
+          creado_en: string | null
+          id: string
+          id_match: string
+          id_remitente: string
+          leido: boolean | null
+        }
+        Insert: {
+          contenido: string
+          creado_en?: string | null
+          id?: string
+          id_match: string
+          id_remitente: string
+          leido?: boolean | null
+        }
+        Update: {
+          contenido?: string
+          creado_en?: string | null
+          id?: string
+          id_match?: string
+          id_remitente?: string
+          leido?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensajes_id_match_fkey"
+            columns: ["id_match"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_id_remitente_fkey"
+            columns: ["id_remitente"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          bio: string | null
+          creado_en: string | null
+          email: string
+          foto_perfil: string | null
+          id: string
+          idioma_aprender: string
+          idioma_nativo: string
+          nombre: string
+          pais: string | null
+        }
+        Insert: {
+          bio?: string | null
+          creado_en?: string | null
+          email: string
+          foto_perfil?: string | null
+          id: string
+          idioma_aprender: string
+          idioma_nativo: string
+          nombre: string
+          pais?: string | null
+        }
+        Update: {
+          bio?: string | null
+          creado_en?: string | null
+          email?: string
+          foto_perfil?: string | null
+          id?: string
+          idioma_aprender?: string
+          idioma_nativo?: string
+          nombre?: string
+          pais?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

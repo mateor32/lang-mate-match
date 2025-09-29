@@ -1,11 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useAuth } from "@/integrations/supabase/auth";
+import { toast } from "sonner";
 
-interface LoginPageProps {
-  onLogin: () => void;
-}
+const LoginPage = () => {
+  const { signInWithGoogle } = useAuth();
 
-const LoginPage = ({ onLogin }: LoginPageProps) => {
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      console.error('Error al iniciar sesión:', error);
+      toast.error('Error al iniciar sesión con Google');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8 shadow-elevated">
@@ -43,7 +52,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
 
           {/* Login Button */}
           <Button 
-            onClick={onLogin}
+            onClick={handleGoogleLogin}
             className="w-full bg-gradient-primary hover:opacity-90 text-white font-semibold py-3 rounded-xl transition-smooth"
             size="lg"
           >

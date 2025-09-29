@@ -1,23 +1,27 @@
-import { useState } from "react";
-import LoginPage from "@/components/LoginPage";
+import { useAuth } from "@/integrations/supabase/auth";
 import Dashboard from "@/components/Dashboard";
+import LoginPage from "@/components/LoginPage";
 
 const Index = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { user, loading } = useAuth();
 
-  const handleLogin = () => {
-    setIsLoggedIn(true);
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-  };
-
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={handleLogin} />;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary via-accent to-secondary">
+        <div className="text-white text-xl">Cargando...</div>
+      </div>
+    );
   }
 
-  return <Dashboard onLogout={handleLogout} />;
+  return (
+    <div className="min-h-screen">
+      {!user ? (
+        <LoginPage />
+      ) : (
+        <Dashboard />
+      )}
+    </div>
+  );
 };
 
 export default Index;

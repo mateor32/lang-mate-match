@@ -31,16 +31,30 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
 
   // Usuario actual mock (puedes reemplazar por tu sesión real)
   // Ejemplo al crear un user
-  const [currentUser, setCurrentUser] = useState<User>({
-    id: 1,
-    nombre: "Mateo",
-    email: "mateo@example.com",
-    edad: 22,
-    pais: "Colombia",
-    idiomasNativos: ["Español"],
-    idiomasAprender: ["Inglés"],
-    foto: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/usuarios/3") // <-- aquí pones el id del usuario logueado
+      .then((res) => res.json())
+      .then((data) => {
+        const usuarioBD: User = {
+          id: data.id,
+          nombre: data.nombre,
+          email: data.email,
+          edad: data.edad,
+          pais: data.pais,
+          idiomasNativos: [data.idioma_nativo || "Español"],
+          idiomasAprender: [data.idioma_aprender || "Inglés"],
+          foto:
+            data.foto ||
+            "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+        };
+        setCurrentUser(usuarioBD);
+      })
+      .catch((err) => console.error("Error cargando usuario:", err));
+  }, []);
+  // Aquí pones la condición
+  if (!currentUser) return <p>Cargando perfil...</p>;
 
   // Lista de usuarios convertida a tipo User
   const users: User[] = usuarios.map(usuarioToUser);
@@ -153,9 +167,14 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
                   </Badge>
                 )}
               </Button>
-              <Button variant="ghost" size="sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => (window.location.href = "/settings")}
+              >
                 <Settings className="w-4 h-4" />
               </Button>
+
               <Button variant="ghost" size="sm" onClick={onLogout}>
                 <LogOut className="w-4 h-4" />
               </Button>

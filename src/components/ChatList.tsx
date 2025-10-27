@@ -11,13 +11,15 @@ interface User {
   nombre: string;
   edad: number;
   pais: string;
-  idiomasNativos: string[];
-  idiomasAprender: string[];
+  usuario_idioma?: {
+    tipo: string;
+    id: number;
+    nombre: string;
+  }[];
+  intereses?: { id: number; nombre: string }[];
   foto: string;
   bio?: string;
-  intereses?: string[];
 }
-
 interface Match {
   user: User;
   lastMessage?: string;
@@ -32,10 +34,14 @@ interface ChatListProps {
   onSelectChat: (user: User) => void;
 }
 
-const ChatList = ({ matches, onBackToDiscover, onSelectChat }: ChatListProps) => {
+const ChatList = ({
+  matches,
+  onBackToDiscover,
+  onSelectChat,
+}: ChatListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredMatches = matches.filter(match => 
+  const filteredMatches = matches.filter((match) =>
     match.user.nombre.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -45,9 +51,9 @@ const ChatList = ({ matches, onBackToDiscover, onSelectChat }: ChatListProps) =>
         {/* Header */}
         <div className="p-4 border-b bg-gradient-primary text-white rounded-t-lg">
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onBackToDiscover}
               className="text-white hover:bg-white/20"
             >
@@ -85,13 +91,14 @@ const ChatList = ({ matches, onBackToDiscover, onSelectChat }: ChatListProps) =>
               </div>
               <div>
                 <h3 className="font-medium text-muted-foreground">
-                  {matches.length === 0 ? "Sin matches aún" : "No hay conversaciones"}
+                  {matches.length === 0
+                    ? "Sin matches aún"
+                    : "No hay conversaciones"}
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {matches.length === 0 
-                    ? "¡Sigue deslizando para encontrar compañeros de idiomas!" 
-                    : "No se encontraron conversaciones con ese nombre"
-                  }
+                  {matches.length === 0
+                    ? "¡Sigue deslizando para encontrar compañeros de idiomas!"
+                    : "No se encontraron conversaciones con ese nombre"}
                 </p>
               </div>
             </div>
@@ -107,7 +114,9 @@ const ChatList = ({ matches, onBackToDiscover, onSelectChat }: ChatListProps) =>
                     <div className="relative">
                       <Avatar className="w-12 h-12">
                         <AvatarImage src={match.user.foto} />
-                        <AvatarFallback>{match.user.nombre.charAt(0)}</AvatarFallback>
+                        <AvatarFallback>
+                          {match.user.nombre.charAt(0)}
+                        </AvatarFallback>
                       </Avatar>
                       {match.isOnline && (
                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-accent border-2 border-white rounded-full"></div>
@@ -116,21 +125,28 @@ const ChatList = ({ matches, onBackToDiscover, onSelectChat }: ChatListProps) =>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-medium truncate">{match.user.nombre}</h3>
+                        <h3 className="font-medium truncate">
+                          {match.user.nombre}
+                        </h3>
                         {match.lastMessageTime && (
                           <span className="text-xs text-muted-foreground">
                             {match.lastMessageTime}
                           </span>
                         )}
                       </div>
-                      
+
                       <div className="flex items-center gap-2 mt-1">
                         <div className="flex gap-1">
-                          {match.user.idiomasNativos.slice(0, 2).map((idioma, index) => (
-                            <span key={index} className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
-                              {idioma}
-                            </span>
-                          ))}
+                          {match.user.usuario_idioma
+                            .slice(0, 2)
+                            .map((idioma, index) => (
+                              <span
+                                key={index}
+                                className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded"
+                              >
+                                {idioma.nombre}
+                              </span>
+                            ))}
                         </div>
                       </div>
 

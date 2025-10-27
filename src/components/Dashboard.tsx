@@ -34,26 +34,30 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/usuarios/3") // <-- aquí pones el id del usuario logueado
+    fetch("http://localhost:5000/api/usuarios/7")
       .then((res) => res.json())
       .then((data) => {
         const usuarioBD: User = {
           id: data.id,
           nombre: data.nombre,
-          email: data.email,
-          edad: data.edad,
-          pais: data.pais,
-          idiomasNativos: [data.idioma_nativo || "Español"],
-          idiomasAprender: [data.idioma_aprender || "Inglés"],
+
           foto:
             data.foto ||
             "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+          // Aquí tomamos todos los nombres de los idiomas
+          usuario_idioma: data.idiomas.map((i: any, index: number) => ({
+            nombre: i.nombre,
+            id: data.id,
+            tipo: index === 0 ? "nativo" : "aprender", // el primero nativo, el resto aprender
+          })),
+
+          //idiomas: [],
         };
         setCurrentUser(usuarioBD);
       })
       .catch((err) => console.error("Error cargando usuario:", err));
   }, []);
-  // Aquí pones la condición
+
   if (!currentUser) return <p>Cargando perfil...</p>;
 
   // Lista de usuarios convertida a tipo User
@@ -98,16 +102,31 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
     setCurrentView("matches");
   };
 
-  const mockMatches = matches.map((user, index) => ({
-    user,
-    lastMessage:
-      index === 0
-        ? "¡Perfecto! Podemos organizar eso."
-        : "That sounds interesting!",
-    lastMessageTime: index === 0 ? "hace 2 min" : "hace 1 h",
-    unreadCount: index === 0 ? 2 : 0,
-    isOnline: index < 2,
-  }));
+  const mockMatches = matches.map((user, index) => {
+    const idiomasNativos =
+      user.usuario_idioma
+        ?.filter((i) => i.tipo === "nativo")
+        .map((i) => i.nombre) ?? [];
+    const idiomasAprender =
+      user.usuario_idioma
+        ?.filter((i) => i.tipo === "aprender")
+        .map((i) => i.nombre) ?? [];
+
+    return {
+      user: {
+        ...user,
+        idiomasNativos,
+        idiomasAprender,
+      },
+      lastMessage:
+        index === 0
+          ? "¡Perfecto! Podemos organizar eso."
+          : "That sounds interesting!",
+      lastMessageTime: index === 0 ? "hace 2 min" : "hace 1 h",
+      unreadCount: index === 0 ? 2 : 0,
+      isOnline: index < 2,
+    };
+  });
 
   if (loading) return <p>Cargando usuarios...</p>;
 
@@ -199,27 +218,39 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
                   </Avatar>
                   <div>
                     <h3 className="text-xl font-bold">{currentUser.nombre}</h3>
-                    <p className="text-muted-foreground">{currentUser.email}</p>
                   </div>
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground mb-2">
                         Tu idioma
                       </p>
-                      <Badge className="bg-accent/10 text-accent border-accent/20">
-                        {currentUser.idiomasNativos[0]}
-                      </Badge>
+                      {currentUser.usuario_idioma
+                        ?.filter((i) => i.tipo === "nativo")
+                        .map((i, idx) => (
+                          <Badge
+                            key={idx}
+                            className="bg-accent/10 text-accent border-accent/20 mr-1"
+                          >
+                            {i.nombre}
+                          </Badge>
+                        )) || <Badge variant="outline">Sin idioma</Badge>}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground mb-2">
                         Quieres aprender
                       </p>
-                      <Badge
-                        variant="outline"
-                        className="border-primary/20 text-primary"
-                      >
-                        {currentUser.idiomasAprender[0]}
-                      </Badge>
+
+                      {currentUser.usuario_idioma
+                        ?.filter((i) => i.tipo === "aprender")
+                        .map((i, idx) => (
+                          <Badge
+                            key={idx}
+                            variant="outline"
+                            className="border-primary/20 text-primary mr-1"
+                          >
+                            {i.nombre}
+                          </Badge>
+                        )) || <Badge variant="outline">Sin idioma</Badge>}
                     </div>
                   </div>
                   {matches.length > 0 && (

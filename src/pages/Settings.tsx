@@ -1,111 +1,53 @@
-// src/pages/Settings.tsx
-import React, { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 
-interface User {
+interface Idioma {
+  id: number;
+  nombre: string;
+}
+
+interface Usuario {
   id: number;
   nombre: string;
   email: string;
-  edad: number;
-  pais: string;
-  foto: string;
+  foto?: string | null;
+  idiomas: Idioma[];
 }
 
-const Settings: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
+export default function UsuarioDetalle({ usuarioId }: { usuarioId: number }) {
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
-    // Cargar datos del usuario
-    fetch("http://localhost:5000/api/usuarios/1") // <-- Reemplaza con el id del usuario logueado
+    fetch(`http://localhost:5000/api/usuarios/1`)
       .then((res) => res.json())
       .then((data) => {
-        setUser(data);
-        setLoading(false);
+        console.log(data); // Verifica la estructura
+        setUsuario(data);
       })
-      .catch((err) => {
-        console.error("Error cargando usuario:", err);
-        setLoading(false);
-      });
-  }, []);
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
+  }, [usuarioId]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user) return;
-    setUser({ ...user, [e.target.name]: e.target.value });
-  };
-
-  const handleSave = async () => {
-    if (!user) return;
-
-    try {
-      const res = await fetch(`http://localhost:5000/api/usuarios/${user.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(user),
-      });
-
-      if (!res.ok) throw new Error("Error actualizando usuario");
-
-      alert("Datos actualizados correctamente ✅");
-      navigate("/"); // Regresa al dashboard o a la página principal
-    } catch (err) {
-      console.error(err);
-      alert("Error al actualizar los datos ❌");
-    }
-  };
-
-  if (loading) return <p>Cargando datos...</p>;
-  if (!user) return <p>No se pudo cargar el usuario</p>;
+  if (loading) return <p>Cargando usuario...</p>;
+  if (!usuario) return <p>No se encontró el usuario.</p>;
 
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Configuración de perfil</h1>
-
-      <div className="space-y-4 max-w-md">
-        <div>
-          <label className="block mb-1 font-medium">Nombre</label>
-          <Input name="nombre" value={user.nombre} onChange={handleChange} />
-        </div>
-
-        <div>
-          <label className="block mb-1 font-medium">Email</label>
-          <Input name="email" value={user.email} onChange={handleChange} />
-        </div>
-
-        <div>
-          <label className="block mb-1 font-medium">Edad</label>
-          <Input
-            type="number"
-            name="edad"
-            value={user.edad}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label className="block mb-1 font-medium">País</label>
-          <Input name="pais" value={user.pais} onChange={handleChange} />
-        </div>
-
-        <div>
-          <label className="block mb-1 font-medium">Foto (URL)</label>
-          <Input name="foto" value={user.foto} onChange={handleChange} />
-          <img
-            src={user.foto}
-            alt="Foto"
-            className="w-24 h-24 mt-2 rounded-full"
-          />
-        </div>
-
-        <Button onClick={handleSave}>Guardar cambios</Button>
-      </div>
+    <div>
+      <h2>{usuario.nombre}</h2>
+      <p>Email: {usuario.email}</p>
+      {usuario.foto && (
+        <img src={usuario.foto} alt={usuario.nombre} width={100} />
+      )}
+      <h3>Idiomas:</h3>
+      {usuario.idiomas.length > 0 ? (
+        <ul>
+          {usuario.idiomas.map((i) => (
+            <li key={i.id}>{i.nombre}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>Este usuario no tiene idiomas.</p>
+      )}
     </div>
   );
-};
-
-export default Settings;
+}

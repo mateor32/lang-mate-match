@@ -8,11 +8,14 @@ interface User {
   nombre: string;
   edad: number;
   pais: string;
-  idiomasNativos: string[];
-  idiomasAprender: string[];
+  usuario_idioma?: {
+    tipo: string;
+    id: number;
+    nombre: string;
+  }[];
+  intereses?: { id: number; nombre: string }[];
   foto: string;
-  bio?: string;
-  intereses?: string[];
+  bio: string;
 }
 
 interface UserCardProps {
@@ -24,16 +27,20 @@ interface UserCardProps {
 
 const UserCard = ({ user, onLike, onDislike, isAnimating }: UserCardProps) => {
   return (
-    <Card className={`relative w-full max-w-sm mx-auto overflow-hidden shadow-card hover:shadow-elevated transition-smooth ${isAnimating ? 'pointer-events-none' : ''}`}>
+    <Card
+      className={`relative w-full max-w-sm mx-auto overflow-hidden shadow-card hover:shadow-elevated transition-smooth ${
+        isAnimating ? "pointer-events-none" : ""
+      }`}
+    >
       {/* Profile Image */}
       <div className="relative aspect-[4/5] overflow-hidden">
-        <img 
-          src={user.foto} 
+        <img
+          src={user.foto}
           alt={`Perfil de ${user.nombre}`}
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        
+
         {/* Age Badge */}
         <div className="absolute top-4 right-4">
           <Badge className="bg-white/20 backdrop-blur-sm text-white border-0">
@@ -56,49 +63,65 @@ const UserCard = ({ user, onLike, onDislike, isAnimating }: UserCardProps) => {
         {/* Languages */}
         <div className="space-y-3">
           <div>
-            <p className="text-sm font-medium text-muted-foreground mb-2">Idiomas nativos</p>
+            <p className="text-sm font-medium text-muted-foreground mb-2">
+              Idiomas nativos
+            </p>
             <div className="flex flex-wrap gap-2">
-              {user.idiomasNativos.map((idioma, index) => (
-                <Badge key={index} className="bg-accent/10 text-accent border-accent/20 hover:bg-accent/20">
-                  {idioma}
-                </Badge>
-              ))}
+              {user.usuario_idioma
+                ?.filter((i) => i.tipo === "nativo")
+                .map((i, idx) => (
+                  <Badge key={idx}>{i.nombre}</Badge>
+                ))}
             </div>
           </div>
-          
+
           <div>
-            <p className="text-sm font-medium text-muted-foreground mb-2">Quiere aprender</p>
+            <p className="text-sm font-medium text-muted-foreground mb-2">
+              Quiere aprender
+            </p>
             <div className="flex flex-wrap gap-2">
-              {user.idiomasAprender.map((idioma, index) => (
-                <Badge key={index} variant="outline" className="border-primary/20 text-primary hover:bg-primary/10">
-                  {idioma}
-                </Badge>
-              ))}
+              <div className="flex flex-wrap gap-2">
+                {/* Idiomas a aprender */}
+                {user.usuario_idioma
+                  ?.filter((i) => i.tipo === "aprender")
+                  .map((i, idx) => (
+                    <Badge key={idx}>{i.nombre}</Badge>
+                  ))}
+              </div>
             </div>
           </div>
         </div>
-
         {/* Bio */}
         {user.bio && (
           <div>
-            <p className="text-sm text-muted-foreground leading-relaxed">{user.bio}</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {user.bio}
+            </p>
           </div>
         )}
-
         {/* Interests */}
-        {user.intereses && user.intereses.length > 0 && (
+        {/* Intereses */}
+        {user.intereses && user.intereses.length > 0 ? (
           <div>
-            <p className="text-sm font-medium text-muted-foreground mb-2">Intereses</p>
+            <p className="text-sm font-medium text-muted-foreground mb-2">
+              Intereses
+            </p>
             <div className="flex flex-wrap gap-2">
-              {user.intereses.slice(0, 3).map((interes, index) => (
+              {user.intereses.map((interes, index) => (
                 <Badge key={index} variant="secondary" className="text-xs">
                   {interes}
                 </Badge>
               ))}
             </div>
           </div>
+        ) : (
+          <div>
+            <p className="text-sm font-medium text-muted-foreground mb-2">
+              Intereses
+            </p>
+            <Badge variant="outline">Sin intereses</Badge>
+          </div>
         )}
-
         {/* Action Buttons */}
         <div className="flex gap-4 pt-2">
           <Button
@@ -110,7 +133,7 @@ const UserCard = ({ user, onLike, onDislike, isAnimating }: UserCardProps) => {
             <X className="w-5 h-5 mr-2" />
             Pasar
           </Button>
-          
+
           <Button
             size="lg"
             className="flex-1 bg-like hover:bg-like/90 text-white transition-smooth"
@@ -120,7 +143,6 @@ const UserCard = ({ user, onLike, onDislike, isAnimating }: UserCardProps) => {
             Me gusta
           </Button>
         </div>
-
         {/* Chat hint */}
         <div className="text-center pt-2">
           <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">

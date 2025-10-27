@@ -50,8 +50,8 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
             id: data.id,
             tipo: index === 0 ? "nativo" : "aprender", // el primero nativo, el resto aprender
           })),
-
-          //idiomas: [],
+          edad: 0,
+          pais: "",
         };
         setCurrentUser(usuarioBD);
       })
@@ -61,19 +61,43 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
   if (!currentUser) return <p>Cargando perfil...</p>;
 
   // Lista de usuarios convertida a tipo User
-  const users: User[] = usuarios.map(usuarioToUser);
+  const users: User[] = usuarios.map((u: any) => usuarioToUser(u as Usuario));
 
   const currentCardUser = users[currentUserIndex];
 
-  const handleLike = () => {
-    setIsAnimating(true);
-    const isMatch = Math.random() > 0.5;
+  const saveMatch = async (userId1: number, userId2: number) => {
+    try {
+      const res = await fetch("http://localhost:5000/api/matches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario1_id: userId1, usuario2_id: userId2 }), // ✅ corregido
+      });
 
-    setTimeout(() => {
-      if (isMatch && currentCardUser) {
-        setMatchedUser(currentCardUser);
-        setMatches((prev) => [...prev, currentCardUser]);
+      if (!res.ok) throw new Error("Error guardando match");
+
+      const data = await res.json();
+      console.log("Match guardado:", data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleLike = async () => {
+    setIsAnimating(true);
+
+    setTimeout(async () => {
+      if (currentCardUser && currentUser) {
+        const bothLiked = Math.random() > 0.5; // Aquí tu lógica real para saber si ambos dieron like
+
+        if (bothLiked) {
+          setMatchedUser(currentCardUser);
+          setMatches((prev) => [...prev, currentCardUser]);
+
+          // Guardar en DB
+          await saveMatch(currentUser.id, currentCardUser.id);
+        }
       }
+
       setCurrentUserIndex((prev) => prev + 1);
       setIsAnimating(false);
     }, 500);

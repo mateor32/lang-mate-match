@@ -81,14 +81,14 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
       const newMessage: Message = {
         id: messages.length + 1,
         text: message,
-        timestamp: new Date().toLocaleTimeString("es-ES", { 
-          hour: "2-digit", 
-          minute: "2-digit" 
+        timestamp: new Date().toLocaleTimeString("es-ES", {
+          hour: "2-digit",
+          minute: "2-digit",
         }),
         isMe: true,
       };
 
-      setMessages(prev => [...prev, newMessage]);
+      setMessages((prev) => [...prev, newMessage]);
       setMessage("");
 
       // Simulate response after 2 seconds
@@ -100,18 +100,22 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
           "Exactly! I feel the same way.",
           "¡Perfecto! Podemos organizar eso.",
         ];
-        
-        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-        
-        setMessages(prev => [...prev, {
-          id: prev.length + 1,
-          text: randomResponse,
-          timestamp: new Date().toLocaleTimeString("es-ES", { 
-            hour: "2-digit", 
-            minute: "2-digit" 
-          }),
-          isMe: false,
-        }]);
+
+        const randomResponse =
+          responses[Math.floor(Math.random() * responses.length)];
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: prev.length + 1,
+            text: randomResponse,
+            timestamp: new Date().toLocaleTimeString("es-ES", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            isMe: false,
+          },
+        ]);
       }, 2000);
     }
   };
@@ -132,7 +136,7 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
             <Button variant="ghost" size="sm" onClick={onBack}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            
+
             <Avatar className="w-10 h-10">
               <AvatarImage src={user.foto} />
               <AvatarFallback>{user.nombre.charAt(0)}</AvatarFallback>
@@ -148,7 +152,10 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
 
             <div className="flex gap-1">
               {user.idiomasNativos.map((idioma, index) => (
-                <Badge key={index} className="text-xs bg-accent/20 text-accent border-0">
+                <Badge
+                  key={index}
+                  className="text-xs bg-accent/20 text-accent border-0"
+                >
                   {idioma}
                 </Badge>
               ))}
@@ -167,11 +174,17 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
               key={msg.id}
               className={`flex ${msg.isMe ? "justify-end" : "justify-start"}`}
             >
-              <div className={`flex gap-2 max-w-[80%] ${msg.isMe ? "flex-row-reverse" : ""}`}>
+              <div
+                className={`flex gap-2 max-w-[80%] ${
+                  msg.isMe ? "flex-row-reverse" : ""
+                }`}
+              >
                 {!msg.isMe && (
                   <Avatar className="w-8 h-8 mt-auto">
                     <AvatarImage src={user.foto} />
-                    <AvatarFallback className="text-xs">{user.nombre.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="text-xs">
+                      {user.nombre.charAt(0)}
+                    </AvatarFallback>
                   </Avatar>
                 )}
 
@@ -185,7 +198,11 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
                   >
                     <p className="text-sm leading-relaxed">{msg.text}</p>
                   </div>
-                  <p className={`text-xs text-muted-foreground px-1 ${msg.isMe ? "text-right" : ""}`}>
+                  <p
+                    className={`text-xs text-muted-foreground px-1 ${
+                      msg.isMe ? "text-right" : ""
+                    }`}
+                  >
                     {msg.timestamp}
                   </p>
                 </div>
@@ -217,9 +234,9 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
                 onKeyPress={handleKeyPress}
                 className="pr-10 resize-none rounded-full"
               />
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="absolute right-1 top-1/2 transform -translate-y-1/2"
               >
                 <Smile className="w-4 h-4" />

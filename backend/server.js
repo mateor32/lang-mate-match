@@ -1,13 +1,15 @@
 import express from "express";
 import cors from "cors";
 import pkg from "pg";
-import usuariosRouter from "./routes/usuarios.js"; // ← importa tu router
+import usuariosRouter from "./routes/usuarios.js";
+import matchRouter from "./routes/match.js";
+// ← importa tu router
 
 const { Pool } = pkg;
 
 const app = express();
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
 const pool = new Pool({
   user: "postgres",
@@ -18,6 +20,7 @@ const pool = new Pool({
 });
 
 app.use("/api/usuarios", usuariosRouter);
+app.use("/api/matches", matchRouter(pool)); // <-- PASAR pool
 
 app.get("/api/usuarios", async (req, res) => {
   try {

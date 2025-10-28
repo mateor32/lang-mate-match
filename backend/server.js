@@ -4,6 +4,7 @@ import pkg from "pg";
 import usuariosRouter from "./routes/usuarios.js";
 import matchRouter from "./routes/match.js";
 // ← importa tu router
+import { googleAuth } from "./controllers/authController.js";
 
 const { Pool } = pkg;
 
@@ -21,6 +22,8 @@ const pool = new Pool({
 
 app.use("/api/usuarios", usuariosRouter);
 app.use("/api/matches", matchRouter(pool)); // <-- PASAR pool
+
+app.post("/api/auth/google", googleAuth);
 
 app.get("/api/usuarios", async (req, res) => {
   try {

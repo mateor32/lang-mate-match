@@ -37,8 +37,18 @@ interface Message {
   isMe: boolean;
 }
 
-export default function MatchesPage() {
-  const userId = 7; // Usuario logueado
+export default function MatchesPage({
+  userId,
+  matches: propMatches,
+  onBackToDiscover,
+  onSelectChat,
+}: {
+  userId: number;
+  matches: Match[];
+  onBackToDiscover: () => void;
+  onSelectChat: (user: User) => void;
+}) {
+  //const userId = 7; // Usuario logueado
   const { matches, loading } = useMatches(userId);
 
   const [selectedMatch, setSelectedMatch] = useState<User | null>(null);

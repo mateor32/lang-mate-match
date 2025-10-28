@@ -16,11 +16,13 @@ import { usuarioToUser, User } from "@/utils/usuarioToUser";
 
 interface DashboardProps {
   onLogout: () => void;
+  userId: number; // CLAVE: La prop debe ser 'userId: number'
 }
 
 type ViewType = "discover" | "matches" | "chat";
 
-const Dashboard = ({ onLogout }: DashboardProps) => {
+// 1. Recibir userId como prop
+const Dashboard = ({ onLogout, userId }: DashboardProps) => {
   const { usuarios, loading } = useUsuarios();
   const [currentUserIndex, setCurrentUserIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -29,40 +31,50 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
   const [currentView, setCurrentView] = useState<ViewType>("discover");
   const [selectedChatUser, setSelectedChatUser] = useState<User | null>(null);
 
-  // Usuario actual mock (puedes reemplazar por tu sesión real)
-  // Ejemplo al crear un user
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/usuarios/7")
-      .then((res) => res.json())
+    // 2. Usamos el userId de la prop para el fetch (se evita el "undefined")
+    fetch(`http://localhost:5000/api/usuarios/${userId}`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! Status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
+        // Aseguramos que data.idiomas sea un array
+        const idiomasArray = Array.isArray(data.idiomas) ? data.idiomas : [];
+
         const usuarioBD: User = {
           id: data.id,
           nombre: data.nombre,
 
+          // 3. CLAVE: Usamos la foto real (columna 'foto' de su DB)
           foto:
             data.foto ||
             "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
-          // Aquí tomamos todos los nombres de los idiomas
-          usuario_idioma: data.idiomas.map((i: any, index: number) => ({
+
+          usuario_idioma: idiomasArray.map((i: any, index: number) => ({
             nombre: i.nombre,
             id: data.id,
             tipo: index === 0 ? "nativo" : "aprender", // el primero nativo, el resto aprender
           })),
           edad: 0,
-          pais: "",
+          pais: data.pais || "",
+          bio: data.bio || "",
         };
         setCurrentUser(usuarioBD);
       })
-      .catch((err) => console.error("Error cargando usuario:", err));
-  }, []);
+      .catch((err) => console.error(`Error cargando usuario ${userId}:`, err));
+  }, [userId]); // Dependencia clave
 
   if (!currentUser) return <p>Cargando perfil...</p>;
 
-  // Lista de usuarios convertida a tipo User
-  const users: User[] = usuarios.map((u: any) => usuarioToUser(u as Usuario));
-
+  // Lista de usuarios convertida a tipo User (filtrando al usuario logueado)
+  const users: User[] = usuarios
+    .filter((u) => u.id !== currentUser.id)
+    .map((u: any) => usuarioToUser(u as Usuario));
   const currentCardUser = users[currentUserIndex];
 
   const saveMatch = async (userId1: number, userId2: number) => {
@@ -332,12 +344,15 @@ const Dashboard = ({ onLogout }: DashboardProps) => {
                   )}
                 </>
               )}
-
-              <ChatList
-                matches={mockMatches}
-                onSelectChat={handleSelectChat}
-                onBackToDiscover={handleBackToDiscover}
-              />
+              {/* 4. Pasar el userId al ChatList */}
+              {currentUser && (
+                <ChatList
+                  userId={currentUser.id}
+                  matches={mockMatches}
+                  onSelectChat={handleSelectChat}
+                  onBackToDiscover={handleBackToDiscover}
+                />
+              )}
 
               {currentView === "chat" && selectedChatUser && (
                 <ChatWindow

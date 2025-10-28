@@ -100,14 +100,37 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
 
     setTimeout(async () => {
       if (currentCardUser && currentUser) {
-        const bothLiked = Math.random() > 0.5; // Aquí tu lógica real para saber si ambos dieron like
+        const userId1 = currentUser.id; // Usuario actual dando "like"
+        const userId2 = currentCardUser.id; // Usuario que recibe el "like"
 
-        if (bothLiked) {
-          setMatchedUser(currentCardUser);
-          setMatches((prev) => [...prev, currentCardUser]);
+        // 1. ENVIAR LIKE y CHEQUEAR MUTUALIDAD en el backend
+        const likeResponse = await fetch("http://localhost:5000/api/likes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            swiper_id: userId1,
+            swiped_id: userId2,
+          }),
+        });
 
-          // Guardar en DB
-          await saveMatch(currentUser.id, currentCardUser.id);
+        if (!likeResponse.ok) {
+          console.error("Error al registrar el like/chequear match");
+          setIsAnimating(false);
+          return;
+        }
+
+        const likeData = await likeResponse.json();
+
+        // 2. AHORA: solo si el backend confirma un match mutuo
+        if (likeData.matchFound) {
+          // <--- AQUÍ ES DONDE VA EL BLOQUE
+          setMatchedUser(currentCardUser); // Muestra el modal de MatchModal
+          setMatches((prev) => [...prev, currentCardUser]); // Actualiza la lista de matches en el estado local
+
+          // Guardar el match en la base de datos (tabla 'matches')
+          const idA = Math.min(userId1, userId2);
+          const idB = Math.max(userId1, userId2);
+          await saveMatch(idA, idB); // Llama a la función para registrar el match en la BD
         }
       }
 

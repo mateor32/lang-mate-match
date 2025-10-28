@@ -21,6 +21,59 @@ const pool = new Pool({
   port: 5432,
 });
 
+app.post("/api/likes", async (req, res) => {
+  const { swiper_id, swiped_id } = req.body;
+
+  if (swiper_id === swiped_id) {
+    return res.status(400).json({ error: "No se puede dar like a uno mismo" });
+  }
+
+  try {
+    // 1. Intentar registrar el like unilateral
+    // Usamos INSERT ... ON CONFLICT DO NOTHING para evitar duplicados y errores
+    await pool.query(
+      `INSERT INTO likes (usuario1_id, usuario2_id) 
+       VALUES ($1, $2)
+       ON CONFLICT (usuario1_id, usuario2_id) DO NOTHING`,
+      [swiper_id, swiped_id]
+    );
+
+    // 2. Verificar si existe un like recíproco (Match Mutuo)
+    const reciprocalLike = await pool.query(
+      `SELECT * FROM likes 
+       WHERE usuario1_id = $1 AND usuario2_id = $2`,
+      [swiped_id, swiper_id]
+    );
+
+    const matchFound = reciprocalLike.rows.length > 0;
+
+    if (matchFound) {
+      // 3. Opcional: Limpiar likes unilaterales después del match para mantener la tabla limpia.
+      // Se eliminan ambos likes unilaterales (el original y el recíproco).
+      await pool.query(
+        `DELETE FROM likes 
+         WHERE (usuario1_id = $1 AND usuario2_id = $2)
+            OR (usuario1_id = $2 AND usuario2_id = $1)`,
+        [swiper_id, swiped_id]
+      );
+
+      console.log(
+        `[MATCH MUTUO] between ${swiper_id} and ${swiped_id}. Likes eliminados.`
+      );
+
+      return res.json({ matchFound: true, swiper_id, swiped_id });
+    }
+
+    // 4. Si no hay match
+    res.json({ matchFound: false });
+  } catch (err) {
+    console.error("Error en la gestión de likes:", err);
+    res
+      .status(500)
+      .json({ error: "Error interno del servidor al procesar like" });
+  }
+});
+
 app.use("/api/usuarios", usuariosRouter);
 app.use("/api/matches", matchRouter(pool));
 app.use("/api/messages", messageRouter); // <-- NUEVO: Monta el router de mensajes

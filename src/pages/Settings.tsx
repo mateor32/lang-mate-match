@@ -1,10 +1,21 @@
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
+import { useForm } from "react-hook-form";
+import { ArrowLeft, User as UserIcon, Save, Upload } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query"; // Importación necesaria
+
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Search, ArrowLeft } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+
+// Definición de tipos para Idiomas e Intereses
+interface Resource {
+  id: number;
+  nombre: string;
+}
 
 interface User {
   id: number;
@@ -16,170 +27,409 @@ interface User {
     id: number;
     nombre: string;
   }[];
-  intereses?: { id: number; nombre: string }[];
+  intereses?: Resource[];
   foto: string;
   bio?: string;
 }
-interface Match {
-  user: User;
-  lastMessage?: string;
-  lastMessageTime?: string;
-  unreadCount?: number;
-  isOnline?: boolean;
+
+// Modelo de datos para el formulario de edición de perfil
+interface ProfileFormValues {
+  nombre: string;
+  bio: string;
+  pais: string;
+  foto: string;
 }
 
-interface ChatListProps {
-  matches: Match[];
-  onBackToDiscover: () => void;
-  onSelectChat: (user: User) => void;
-}
+// ------------------------------------------
+// 2. Componente de Configuración del Perfil
+// ------------------------------------------
+export default function ProfileSettings() {
+  // CLAVE: Obtener el userId del almacenamiento local en lugar de hardcodeo
+  const loggedUserId = localStorage.getItem("loggedUserId");
+  const userId = loggedUserId ? parseInt(loggedUserId, 10) : null;
 
-const ChatList = ({
-  matches,
-  onBackToDiscover,
-  onSelectChat,
-}: ChatListProps) => {
-  const [searchQuery, setSearchQuery] = useState("");
+  const queryClient = useQueryClient(); // Inicializar React Query Client
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const filteredMatches = matches.filter((match) =>
-    match.user.nombre.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Estados para recursos disponibles y selecciones
+  const [availableLanguages, setAvailableLanguages] = useState<Resource[]>([]);
+  const [availableInterests, setAvailableInterests] = useState<Resource[]>([]);
+  const [selectedNativos, setSelectedNativos] = useState<number[]>([]);
+  const [selectedAprendiendo, setSelectedAprendiendo] = useState<number[]>([]);
+  const [selectedIntereses, setSelectedIntereses] = useState<number[]>([]);
 
+  const form = useForm<ProfileFormValues>();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { isSubmitting },
+  } = form;
+
+  const API_BASE_URL = "http://localhost:5000/api";
+
+  const handleSelection = (
+    id: number,
+    currentSelection: number[],
+    setter: React.Dispatch<React.SetStateAction<number[]>>
+  ) => {
+    if (currentSelection.includes(id)) {
+      setter(currentSelection.filter((itemId) => itemId !== id));
+    } else {
+      setter([...currentSelection, id]);
+    }
+  };
+
+  // ------------------------------------------
+  // Lógica de Carga del Perfil y Recursos
+  // ------------------------------------------
+  const fetchProfileData = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      // 1. Fetch recursos disponibles
+      const [langRes, intRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/usuarios/idiomas`),
+        fetch(`${API_BASE_URL}/usuarios/intereses`),
+      ]);
+      const availableLanguagesData = langRes.ok ? await langRes.json() : [];
+      const availableInterestsData = intRes.ok ? await intRes.json() : [];
+      setAvailableLanguages(availableLanguagesData);
+      setAvailableInterests(availableInterestsData);
+
+      // 2. Fetch datos del usuario logueado
+      const userRes = await fetch(`${API_BASE_URL}/usuarios/${userId}`);
+      if (!userRes.ok) throw new Error(`Error cargando usuario ${userId}`);
+      const data = await userRes.json();
+
+      // 3. Adaptar datos de la API para el estado y formulario
+      const idiomasArray = Array.isArray(data.idiomas) ? data.idiomas : [];
+      // Corregido: Usar i.id para mapear IDs
+      const nativosIds = idiomasArray
+        .filter((i: any) => i.tipo === "nativo")
+        .map((i: any) => i.id);
+      const aprendiendoIds = idiomasArray
+        .filter((i: any) => i.tipo === "aprender")
+        .map((i: any) => i.id);
+
+      const interesesRes = await fetch(
+        `${API_BASE_URL}/usuarios/${userId}/intereses`
+      );
+      const interesesData = interesesRes.ok ? await interesesRes.json() : [];
+      // Corregido: Usar i.id para mapear IDs
+      const interesesIds = interesesData.map((i: any) => i.id);
+
+      setSelectedNativos(nativosIds);
+      setSelectedAprendiendo(aprendiendoIds);
+      setSelectedIntereses(interesesIds);
+
+      const user: User = {
+        id: data.id,
+        nombre: data.nombre,
+        foto: data.foto || "/placeholder.svg",
+        edad: data.fecha_nacimiento
+          ? new Date().getFullYear() -
+            new Date(data.fecha_nacimiento).getFullYear()
+          : 0,
+        pais: data.pais || "",
+        bio: data.bio || "",
+        intereses: interesesData,
+      };
+
+      setCurrentUser(user);
+
+      // Inicializar el formulario con datos básicos
+      reset({
+        nombre: user.nombre,
+        bio: user.bio || "",
+        pais: user.pais,
+        foto: user.foto,
+      });
+    } catch (err) {
+      console.error("Error cargando perfil:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, reset]); // userId es clave de dependencia
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [fetchProfileData]);
+
+  // ------------------------------------------
+  // Lógica de Envío (Guardar)
+  // ------------------------------------------
+  // ... en src/pages/Settings.tsx (dentro de onSubmit, alrededor de la línea 205)
+
+  const onSubmit = async (data: ProfileFormValues) => {
+    if (!userId) return;
+    try {
+      const API_BASE_URL = "http://localhost:5000/api";
+      // Asumiendo que data.foto contiene la URL actual (aunque sea el placeholder)
+
+      // 1. Actualizar Perfil Básico
+      const basicUpdatePromise = fetch(`${API_BASE_URL}/usuarios/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: data.nombre,
+          bio: data.bio,
+          pais: data.pais,
+          foto: data.foto,
+        }),
+      });
+
+      // 2. Actualizar Idiomas
+      const langUpdatePromise = fetch(
+        `${API_BASE_URL}/usuarios/${userId}/idiomas`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nativos: selectedNativos,
+            aprendiendo: selectedAprendiendo,
+          }),
+        }
+      );
+
+      // 3. Actualizar Intereses
+      const intUpdatePromise = fetch(
+        `${API_BASE_URL}/usuarios/${userId}/intereses`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            intereses: selectedIntereses,
+          }),
+        }
+      );
+
+      const results = await Promise.all([
+        basicUpdatePromise,
+        langUpdatePromise,
+        intUpdatePromise,
+      ]);
+
+      const allOk = results.every((res) => res.ok);
+
+      if (!allOk) {
+        // Manejar errores para saber cuál falló y obtener el mensaje de error del backend
+        const failedResponse = results.find((res) => !res.ok);
+        const errorBody = failedResponse
+          ? await failedResponse.json()
+          : { error: "Error desconocido." };
+
+        throw new Error(
+          `Al menos una de las actualizaciones falló: ${errorBody.error}`
+        );
+      }
+
+      console.log("Perfil, Idiomas e Intereses actualizados con éxito!");
+
+      // Invalidación y recarga (CLAVE para que el Dashboard vea el nuevo nombre)
+      await queryClient.invalidateQueries({
+        queryKey: ["currentUser", userId],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["allUsers"] });
+
+      await fetchProfileData();
+    } catch (error) {
+      console.error("Error al guardar el perfil:", error);
+      // Aquí puedes mostrar un toast con el error
+      // alert(error.message);
+    }
+  };
+
+  if (loading || userId === null)
+    return <p className="text-center mt-10">Cargando configuración...</p>;
+  if (!currentUser)
+    return <p className="text-center mt-10">No se pudo cargar el perfil.</p>;
   return (
-    <div className="max-w-md mx-auto">
-      <Card className="h-[600px] flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b bg-gradient-primary text-white rounded-t-lg">
+    <div className="max-w-xl mx-auto py-8">
+      <Card>
+        <CardHeader className="bg-gradient-primary text-white rounded-t-lg">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
-              onClick={onBackToDiscover}
+              onClick={() => window.history.back()}
               className="text-white hover:bg-white/20"
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <div className="flex items-center gap-2 flex-1">
-              <MessageCircle className="w-5 h-5" />
-              <h2 className="font-bold text-lg">Matches</h2>
-            </div>
-            <Badge className="bg-white/20 text-white border-0">
-              //{matches.length}
-            </Badge>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <UserIcon className="w-6 h-6" />
+              Editar Perfil
+            </CardTitle>
           </div>
-        </div>
+        </CardHeader>
 
-        {/* Search */}
-        <div className="p-4 border-b">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar conversaciones..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        {/* Matches List */}
-        <div className="flex-1 overflow-y-auto">
-          {filteredMatches.length === 0 ? (
-            <div className="p-8 text-center space-y-4">
-              <div className="w-16 h-16 mx-auto bg-muted rounded-full flex items-center justify-center">
-                <MessageCircle className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <div>
-                <h3 className="font-medium text-muted-foreground">
-                  {matches.length === 0
-                    ? "Sin matches aún"
-                    : "No hay conversaciones"}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {matches.length === 0
-                    ? "¡Sigue deslizando para encontrar compañeros de idiomas!"
-                    : "No se encontraron conversaciones con ese nombre"}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {filteredMatches.map((match) => (
-                <div
-                  key={match.user.id}
-                  onClick={() => onSelectChat(match.user)}
-                  className="p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Sección de Foto y Nombre */}
+            <div className="flex items-center gap-6">
+              <div className="relative">
+                <Avatar className="w-24 h-24 shadow-md">
+                  <AvatarImage src={currentUser.foto} />
+                  <AvatarFallback className="text-2xl">
+                    {currentUser.nombre.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="absolute bottom-0 right-0 h-8 w-8 rounded-full"
+                  title="Subir nueva foto"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <Avatar className="w-12 h-12">
-                        <AvatarImage src={match.user.foto} />
-                        <AvatarFallback>
-                          {match.user.nombre.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      {match.isOnline && (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-accent border-2 border-white rounded-full"></div>
-                      )}
-                    </div>
+                  <Upload className="w-4 h-4" />
+                </Button>
+              </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-medium truncate">
-                          {match.user.nombre}
-                        </h3>
-                        {match.lastMessageTime && (
-                          <span className="text-xs text-muted-foreground">
-                            {match.lastMessageTime}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex gap-1">
-                          {match.user.usuario_idioma
-                            .slice(0, 2)
-                            .map((idioma, index) => (
-                              <span
-                                key={index}
-                                className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded"
-                              >
-                                {idioma.nombre}
-                              </span>
-                            ))}
-                        </div>
-                      </div>
-
-                      {match.lastMessage && (
-                        <p className="text-sm text-muted-foreground mt-1 truncate">
-                          {match.lastMessage}
-                        </p>
-                      )}
-                    </div>
-
-                    {match.unreadCount && match.unreadCount > 0 && (
-                      <Badge className="bg-primary text-white h-5 min-w-5 text-xs">
-                        {match.unreadCount > 9 ? "9+" : match.unreadCount}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="nombre">Nombre</Label>
+                <Input
+                  id="nombre"
+                  {...register("nombre")}
+                  className="text-lg font-semibold"
+                  placeholder="Tu nombre"
+                />
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Footer tip */}
-        {matches.length === 0 && (
-          <div className="p-4 border-t bg-muted/30">
-            <p className="text-xs text-center text-muted-foreground">
-              💡 Tip: Da "like" a más perfiles para conseguir matches
-            </p>
-          </div>
-        )}
+            {/* Bio y País */}
+            <div className="space-y-1">
+              <Label htmlFor="bio">Biografía</Label>
+              <Textarea
+                id="bio"
+                {...register("bio")}
+                placeholder="Cuéntale al mundo sobre ti..."
+                rows={4}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="pais">País (Ubicación)</Label>
+              <Input
+                id="pais"
+                {...register("pais")}
+                placeholder="Ej: Colombia"
+              />
+            </div>
+
+            <hr className="my-6" />
+
+            {/* Sección de IDIOMAS */}
+            <h3 className="text-xl font-semibold mb-3">Idiomas</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Idioma Nativo */}
+              <div className="space-y-2">
+                <Label className="font-medium text-lg text-primary">
+                  Idioma Nativo
+                </Label>
+                <div className="max-h-40 overflow-y-auto space-y-2 rounded-md border p-3">
+                  {availableLanguages.map((lang) => (
+                    <div key={lang.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`nativo-${lang.id}`}
+                        checked={selectedNativos.includes(lang.id)}
+                        onCheckedChange={() =>
+                          handleSelection(
+                            lang.id,
+                            selectedNativos,
+                            setSelectedNativos
+                          )
+                        }
+                      />
+                      <Label
+                        htmlFor={`nativo-${lang.id}`}
+                        className="font-normal cursor-pointer"
+                      >
+                        {lang.nombre}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Idiomas que quiero Aprender */}
+              <div className="space-y-2">
+                <Label className="font-medium text-lg text-primary">
+                  Quiero Aprender
+                </Label>
+                <div className="max-h-40 overflow-y-auto space-y-2 rounded-md border p-3">
+                  {availableLanguages.map((lang) => (
+                    <div key={lang.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`aprender-${lang.id}`}
+                        checked={selectedAprendiendo.includes(lang.id)}
+                        onCheckedChange={() =>
+                          handleSelection(
+                            lang.id,
+                            selectedAprendiendo,
+                            setSelectedAprendiendo
+                          )
+                        }
+                      />
+                      <Label
+                        htmlFor={`aprender-${lang.id}`}
+                        className="font-normal cursor-pointer"
+                      >
+                        {lang.nombre}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <hr className="my-6" />
+
+            {/* Sección de INTERESES */}
+            <h3 className="text-xl font-semibold mb-3">Intereses</h3>
+            <div className="space-y-2">
+              <div className="max-h-52 overflow-y-auto space-y-2 rounded-md border p-4">
+                {availableInterests.map((interest) => (
+                  <div
+                    key={interest.id}
+                    className="flex items-center space-x-2"
+                  >
+                    <Checkbox
+                      id={`interes-${interest.id}`}
+                      checked={selectedIntereses.includes(interest.id)}
+                      onCheckedChange={() =>
+                        handleSelection(
+                          interest.id,
+                          selectedIntereses,
+                          setSelectedIntereses
+                        )
+                      }
+                    />
+                    <Label
+                      htmlFor={`interes-${interest.id}`}
+                      className="font-normal cursor-pointer"
+                    >
+                      {interest.nombre}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Botón de Guardar */}
+            <Button
+              type="submit"
+              className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3 rounded-xl transition-smooth"
+              disabled={isSubmitting}
+            >
+              <Save className="w-5 h-5 mr-2" />
+              {isSubmitting ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </form>
+        </CardContent>
       </Card>
     </div>
   );
-};
-
-export default ChatList;
+}

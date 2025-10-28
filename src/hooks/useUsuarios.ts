@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query"; 
 import { usuarioToUser, User } from "@/utils/usuarioToUser";
 
 export interface Usuario {
@@ -11,6 +11,7 @@ export interface Usuario {
   sexo: string | null;
   foto: string | null;
 
+  // Nota: Estos campos ahora se obtienen del endpoint /api/usuarios/:id/intereses
   usuario_idioma?: {
     tipo: string;
     id: number;
@@ -19,33 +20,27 @@ export interface Usuario {
   intereses?: { id: number; nombre: string }[];
 }
 
-export const useUsuarios = () => {
-  const [usuarios, setUsuarios] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// Función que realiza el fetch y la transformación de datos
+const fetchAndProcessUsuarios = async () => {
+    // 1. Fetch de todos los usuarios
+    const res = await fetch("http://localhost:5000/api/usuarios");
+    if (!res.ok) throw new Error("Error al cargar usuarios");
+    const data: Usuario[] = await res.json();
 
-  const fetchUsuarios = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("http://localhost:5000/api/usuarios");
-      if (!res.ok) throw new Error("Error al cargar usuarios");
-      const data: Usuario[] = await res.json();
-      console.log("📦 Usuarios desde backend:", data);
-
-      // Convertir usuarios y agregar intereses
-      const converted: User[] = await Promise.all(
+    // 2. Procesar y obtener intereses de cada uno
+    const converted: User[] = await Promise.all(
         data.map(async (usuario) => {
           const user: User = usuarioToUser(usuario);
 
-          // Traer intereses del usuario
+          // Obtener intereses para el usuario
           try {
             const resIntereses = await fetch(
               `http://localhost:5000/api/usuarios/${usuario.id}/intereses`
             );
             if (resIntereses.ok) {
               const interesesData = await resIntereses.json();
-              user.intereses = interesesData.map((i: any) => i.nombre);
+              // El campo 'intereses' de User ahora usará el formato { id, nombre }
+              user.intereses = interesesData.map((i: any) => ({ id: i.id, nombre: i.nombre }));
             } else {
               user.intereses = [];
             }
@@ -55,19 +50,17 @@ export const useUsuarios = () => {
 
           return user;
         })
-      );
+    );
+    return converted;
+};
 
-      setUsuarios(converted);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsuarios();
-  }, []);
-
-  return { usuarios, loading, error, refreshUsuarios: fetchUsuarios };
+// Nuevo hook usando React Query
+export const useUsuarios = () => {
+  // CLAVE: 'allUsers' es el identificador de caché
+  return useQuery<User[], Error>({
+    queryKey: ['allUsers'],
+    queryFn: fetchAndProcessUsuarios,
+    // La data será considerada "fresh" por un tiempo
+    staleTime: 5 * 60 * 1000, 
+  });
 };

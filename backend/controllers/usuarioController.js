@@ -1,18 +1,192 @@
 import { pool } from "../db.js";
 
+// -----------------------------------------------------------
+// Rutas de Lectura (GET)
+// -----------------------------------------------------------
+
+// GET /api/usuarios/idiomas
+export const getIdiomas = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, nombre FROM idiomas ORDER BY nombre"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error al obtener idiomas disponibles:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+// GET /api/usuarios/intereses
+export const getIntereses = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, nombre FROM intereses ORDER BY nombre"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error al obtener intereses disponibles:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+// GET /api/usuarios/:id/intereses (existente)
 export const getInteresesByUsuario = async (req, res) => {
   try {
     const { id } = req.params;
+    const idInt = parseInt(id, 10);
     const result = await pool.query(
       `SELECT i.id, i.nombre
-       FROM usuario_interes ui
-       JOIN intereses i ON ui.interes_id = i.id
-       WHERE ui.usuario_id = $1`,
-      [id]
+         FROM usuario_interes ui
+         JOIN intereses i ON ui.interes_id = i.id
+         WHERE ui.usuario_id = $1`,
+      [idInt]
     );
     res.json(result.rows);
   } catch (err) {
     console.error("Error al obtener intereses:", err);
     res.status(500).json({ message: "Error al obtener intereses" });
+  }
+};
+
+// -----------------------------------------------------------
+// Rutas de Escritura (PUT/PATCH)
+// -----------------------------------------------------------
+
+// PUT /api/usuarios/:id (Perfil Básico)
+export const updateUsuario = async (req, res) => {
+  const { id } = req.params;
+  // La desestructuración toma los valores del cuerpo de la petición.
+  const { nombre, bio, pais, foto } = req.body;
+
+  // Aseguramos que el ID de la URL sea un entero
+  const idInt = parseInt(id, 10);
+
+  // 🔴 REFUERZO: Validar que el nombre no esté vacío, ya que es un campo crítico.
+  if (!nombre || typeof nombre !== "string" || nombre.trim() === "") {
+    return res
+      .status(400)
+      .json({ error: "El nombre es obligatorio y no puede estar vacío." });
+  }
+
+  try {
+    const query = `
+            UPDATE usuarios
+            SET nombre = $1, bio = $2, pais = $3, foto = $4
+            WHERE id = $5
+            RETURNING *
+        `;
+    const result = await pool.query(query, [
+      nombre.trim(), // 👈 Valor del nombre, limpio de espacios
+      bio,
+      pais,
+      foto,
+      idInt,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    res.json({ message: "Perfil básico actualizado", user: result.rows[0] });
+  } catch (err) {
+    console.error("Error al actualizar usuario:", err);
+    // Mostrar error 500
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+// PUT /api/usuarios/:id/idiomas
+export const updateIdiomas = async (req, res) => {
+  const { id } = req.params;
+  const { nativos, aprendiendo } = req.body;
+
+  const idInt = parseInt(id, 10);
+
+  // **CORRECCIÓN CLAVE:** Asegurar que son arrays y convertir a números válidos
+  const nativosArray = Array.isArray(nativos) ? nativos : [];
+  const aprendiendoArray = Array.isArray(aprendiendo) ? aprendiendo : [];
+
+  // Convertir a número y filtrar valores no válidos (0 o no enteros)
+  const nativosInt = nativosArray
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0);
+  const aprendiendoInt = aprendiendoArray
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0);
+
+  try {
+    await pool.query("BEGIN");
+
+    // 1. Eliminar idiomas existentes del usuario
+    await pool.query("DELETE FROM usuario_idioma WHERE usuario_id = $1", [
+      idInt,
+    ]);
+
+    // 2. Insertar idiomas nativos
+    for (const langId of nativosInt) {
+      await pool.query(
+        "INSERT INTO usuario_idioma (usuario_id, idioma_id, tipo) VALUES ($1, $2, 'nativo')",
+        [idInt, langId]
+      );
+    }
+
+    // 3. Insertar idiomas que está aprendiendo
+    for (const langId of aprendiendoInt) {
+      await pool.query(
+        "INSERT INTO usuario_idioma (usuario_id, idioma_id, tipo) VALUES ($1, $2, 'aprender')",
+        [idInt, langId]
+      );
+    }
+
+    await pool.query("COMMIT");
+    res.json({ message: "Idiomas actualizados con éxito" });
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    console.error("Error al actualizar idiomas:", err);
+    res
+      .status(500)
+      .json({ error: "Error interno del servidor al actualizar idiomas" });
+  }
+};
+
+// PUT /api/usuarios/:id/intereses
+export const updateIntereses = async (req, res) => {
+  const { id } = req.params;
+  const { intereses } = req.body;
+
+  const idInt = parseInt(id, 10);
+
+  // **CORRECCIÓN CLAVE:** Asegurar que es un array y convertir a números válidos
+  const interesesArray = Array.isArray(intereses) ? intereses : [];
+
+  // Convertir a número y filtrar valores no válidos (0 o no enteros)
+  const interesesInt = interesesArray
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0);
+
+  try {
+    await pool.query("BEGIN");
+
+    // 1. Eliminar intereses existentes del usuario
+    await pool.query("DELETE FROM usuario_interes WHERE usuario_id = $1", [
+      idInt,
+    ]);
+
+    // 2. Insertar nuevos intereses
+    for (const interesId of interesesInt) {
+      await pool.query(
+        "INSERT INTO usuario_interes (usuario_id, interes_id) VALUES ($1, $2)",
+        [idInt, interesId]
+      );
+    }
+
+    await pool.query("COMMIT");
+    res.json({ message: "Intereses actualizados con éxito" });
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    console.error("Error al actualizar intereses:", err);
+    res
+      .status(500)
+      .json({ error: "Error interno del servidor al actualizar intereses" });
   }
 };

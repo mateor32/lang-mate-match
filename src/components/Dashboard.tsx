@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Settings, MessageCircle, Heart, Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import UserCard from "./UserCard";
 import MatchModal from "./MatchModal";
@@ -23,7 +24,8 @@ type ViewType = "discover" | "matches" | "chat";
 
 // 1. Recibir userId como prop
 const Dashboard = ({ onLogout, userId }: DashboardProps) => {
-  const { usuarios, loading } = useUsuarios();
+  const navigate = useNavigate();
+  const { data: usuarios = [], isLoading: loading, error } = useUsuarios();
   const [currentUserIndex, setCurrentUserIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [matchedUser, setMatchedUser] = useState<User | null>(null);
@@ -255,7 +257,8 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => (window.location.href = "/settings")}
+                // ANTES: onClick={() => (window.location.href = "/settings")}
+                onClick={() => navigate("/settings")} // AHORA: Usa useNavigate
               >
                 <Settings className="w-4 h-4" />
               </Button>

@@ -109,7 +109,8 @@ const UserCard = ({ user, onLike, onDislike, isAnimating }: UserCardProps) => {
             <div className="flex flex-wrap gap-2">
               {user.intereses.map((interes, index) => (
                 <Badge key={index} variant="secondary" className="text-xs">
-                  {interes}
+                  {/* CORRECCIÓN: Acceder a la propiedad nombre */}
+                  {interes.nombre}
                 </Badge>
               ))}
             </div>

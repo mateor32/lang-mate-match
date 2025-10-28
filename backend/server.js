@@ -136,7 +136,7 @@ app.get("/api/usuarios/:id", async (req, res) => {
     const usuario = userResult.rows[0];
 
     const idiomasResult = await pool.query(
-      `SELECT i.id, i.nombre 
+      `SELECT i.id, i.nombre, ui.tipo 
        FROM usuario_idioma ui
        JOIN idiomas i ON ui.idioma_id = i.id
        WHERE ui.usuario_id = $1`,

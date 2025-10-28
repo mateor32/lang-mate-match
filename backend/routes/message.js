@@ -1,5 +1,6 @@
+// mateor32/lang-mate-match/mateor32-lang-mate-match-13c709073e7292ab8e58547abd2a20fbcfde7497/backend/routes/message.js
 import express from "express";
-import pool from "../db";
+import { pool } from "../db.js"; // Se corrige la importación a named export
 
 const router = express.Router();
 
@@ -9,8 +10,8 @@ router.post("/", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO messages (match_id, sender_id, message) 
-       VALUES ($1, $2, $3) RETURNING *`,
+      `INSERT INTO messages (match_id, sender_id, message, created_at) 
+       VALUES ($1, $2, $3, NOW()) RETURNING *`, // Se añade NOW() para timestamp
       [match_id, sender_id, message]
     );
     res.json(result.rows[0]);

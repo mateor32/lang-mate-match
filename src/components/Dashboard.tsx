@@ -1,4 +1,4 @@
-// src/components/Dashboard.tsx
+// mateor32/lang-mate-match/mateor32-lang-mate-match-13c709073e7292ab8e58547abd2a20fbcfde7497/src/components/Dashboard.tsx
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
   const [matches, setMatches] = useState<User[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>("discover");
   const [selectedChatUser, setSelectedChatUser] = useState<User | null>(null);
+  const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null); // <-- NUEVO ESTADO
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -129,15 +130,21 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
     setCurrentView("discover");
     setSelectedChatUser(null);
   };
-  const handleSelectChat = (user: User) => {
+
+  // CLAVE: Recibe el ID del match y el usuario para la ventana de chat
+  const handleSelectChat = (matchId: number, user: User) => {
+    setSelectedMatchId(matchId); // Guarda el ID del match
     setSelectedChatUser(user);
     setCurrentView("chat");
   };
+
   const handleBackToMatches = () => {
+    setSelectedMatchId(null);
     setSelectedChatUser(null);
     setCurrentView("matches");
   };
 
+  // Se usa `matches` para el contador del badge (aunque en un proyecto real se sincronizaría con useMatches)
   const mockMatches = matches.map((user, index) => {
     const idiomasNativos =
       user.usuario_idioma
@@ -344,22 +351,24 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                   )}
                 </>
               )}
-              {/* 4. Pasar el userId al ChatList */}
-              {currentUser && (
+              {currentUser && currentView === "matches" && (
                 <ChatList
                   userId={currentUser.id}
-                  matches={mockMatches}
                   onSelectChat={handleSelectChat}
                   onBackToDiscover={handleBackToDiscover}
                 />
               )}
 
-              {currentView === "chat" && selectedChatUser && (
-                <ChatWindow
-                  user={selectedChatUser}
-                  onBack={handleBackToMatches}
-                />
-              )}
+              {currentView === "chat" &&
+                selectedChatUser &&
+                selectedMatchId && (
+                  <ChatWindow
+                    user={selectedChatUser}
+                    matchId={selectedMatchId} // <-- Se pasa el ID del match
+                    currentUserId={userId} // <-- Se pasa el ID del usuario logueado
+                    onBack={handleBackToMatches}
+                  />
+                )}
             </div>
           </div>
         </div>

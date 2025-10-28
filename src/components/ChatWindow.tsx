@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+// mateor32/lang-mate-match/mateor32-lang-mate-match-13c709073e7292ab8e58547abd2a20fbcfde7497/src/components/ChatWindow.tsx
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,117 +7,142 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Send, Smile, Paperclip, MoreVertical } from "lucide-react";
 
+// Interfaz para el usuario (usando la estructura de datos del proyecto)
 interface User {
   id: number;
   nombre: string;
   edad: number;
   pais: string;
-  idiomasNativos: string[];
-  idiomasAprender: string[];
+  usuario_idioma?: {
+    tipo: string;
+    id: number;
+    nombre: string;
+  }[];
   foto: string;
   bio?: string;
   intereses?: string[];
 }
 
-interface Message {
+// Interfaz para mensajes que vienen de la DB
+interface DbMessage {
   id: number;
+  match_id: number;
+  sender_id: number;
+  message: string; // Contenido del mensaje de la DB
+  created_at: string; // Timestamp de la DB
+}
+
+// Interfaz para el estado del componente
+interface Message extends DbMessage {
   text: string;
   timestamp: string;
   isMe: boolean;
-  isRead?: boolean;
+  isSending?: boolean; // Para manejar el estado de envío en el frontend
 }
 
 interface ChatWindowProps {
   user: User;
+  matchId: number; // ID del match (registro en la tabla 'matches')
+  currentUserId: number; // ID del usuario logueado
   onBack: () => void;
 }
 
-const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
+const ChatWindow = ({
+  user,
+  matchId,
+  currentUserId,
+  onBack,
+}: ChatWindowProps) => {
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      text: "¡Hola! Vi que también estás aprendiendo español. Me encantaría practicar contigo 😊",
-      timestamp: "10:30",
-      isMe: false,
-    },
-    {
-      id: 2,
-      text: "¡Hola! Claro, me parece genial. Yo hablo español nativo y estoy aprendiendo inglés",
-      timestamp: "10:32",
-      isMe: true,
-    },
-    {
-      id: 3,
-      text: "Perfect! We can help each other. What topics do you like to talk about?",
-      timestamp: "10:33",
-      isMe: false,
-    },
-    {
-      id: 4,
-      text: "Me gusta hablar sobre viajes, cultura, música... ¿y tú?",
-      timestamp: "10:35",
-      isMe: true,
-    },
-    {
-      id: 5,
-      text: "Same here! I love traveling. Have you been to the US before?",
-      timestamp: "10:36",
-      isMe: false,
-    },
-  ]);
-
+  const [messages, setMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Lógica para obtener mensajes de la API
+  const fetchMessages = useCallback(async () => {
+    if (!matchId) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/messages/${matchId}`);
+      if (!res.ok) throw new Error("Error al cargar mensajes");
+
+      const data: DbMessage[] = await res.json();
+
+      const convertedMessages: Message[] = data.map((msg: DbMessage) => ({
+        ...msg,
+        // Adaptar campos de la DB al formato del componente
+        text: msg.message,
+        isMe: msg.sender_id === currentUserId,
+        timestamp: new Date(msg.created_at).toLocaleTimeString("es-ES", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        isSending: false,
+      }));
+
+      setMessages(convertedMessages);
+    } catch (error) {
+      console.error("Error al cargar mensajes:", error);
+    }
+  }, [matchId, currentUserId]);
+
+  // Ejecutar al cargar y cada vez que cambie el matchId
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  // Ejecutar al recibir nuevos mensajes
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
+  // Lógica para enviar mensajes a la API
+  const handleSendMessage = async () => {
     if (message.trim()) {
-      const newMessage: Message = {
-        id: messages.length + 1,
-        text: message,
+      const messageToSend = message.trim();
+
+      // 1. Mensaje temporal (Optimistic update)
+      const tempId = Date.now();
+      const tempMessage: Message = {
+        id: tempId,
+        match_id: matchId,
+        sender_id: currentUserId,
+        message: messageToSend,
+        created_at: new Date().toISOString(),
+        text: messageToSend,
         timestamp: new Date().toLocaleTimeString("es-ES", {
           hour: "2-digit",
           minute: "2-digit",
         }),
         isMe: true,
+        isSending: true,
       };
 
-      setMessages((prev) => [...prev, newMessage]);
-      setMessage("");
+      setMessages((prev) => [...prev, tempMessage]);
+      setMessage(""); // Limpiar el input
 
-      // Simulate response after 2 seconds
-      setTimeout(() => {
-        const responses = [
-          "That sounds interesting! Tell me more.",
-          "¡Qué genial! Me encanta esa idea.",
-          "I agree! What do you think about...?",
-          "Exactly! I feel the same way.",
-          "¡Perfecto! Podemos organizar eso.",
-        ];
+      try {
+        const res = await fetch("http://localhost:5000/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            match_id: matchId,
+            sender_id: currentUserId,
+            message: messageToSend,
+          }),
+        });
 
-        const randomResponse =
-          responses[Math.floor(Math.random() * responses.length)];
+        if (!res.ok) throw new Error("Error al enviar el mensaje al backend");
 
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: prev.length + 1,
-            text: randomResponse,
-            timestamp: new Date().toLocaleTimeString("es-ES", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            isMe: false,
-          },
-        ]);
-      }, 2000);
+        // 2. Éxito: Recargar mensajes para obtener el ID real de la DB
+        await fetchMessages();
+      } catch (error) {
+        console.error("Error al enviar mensaje:", error);
+        // 3. Fallo: Revertir el mensaje temporal
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      }
     }
   };
 
@@ -126,6 +152,17 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
       handleSendMessage();
     }
   };
+
+  // Obtener idiomas nativos para el header/tip
+  const nativeLanguages =
+    user.usuario_idioma
+      ?.filter((i) => i.tipo === "nativo")
+      .map((i) => i.nombre) || [];
+  const partnerNativeLang =
+    nativeLanguages.length > 0 ? nativeLanguages[0] : "Nativo";
+
+  // Nota: Dado que `currentUser` no está disponible aquí, asumiremos el español como idioma nativo del usuario logueado para el tip, o se obtendría del contexto del Dashboard.
+  const myNativeLang = "Español";
 
   return (
     <div className="max-w-md mx-auto">
@@ -151,7 +188,7 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
             </div>
 
             <div className="flex gap-1">
-              {user.idiomasNativos.map((idioma, index) => (
+              {nativeLanguages.map((idioma, index) => (
                 <Badge
                   key={index}
                   className="text-xs bg-accent/20 text-accent border-0"
@@ -204,6 +241,7 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
                     }`}
                   >
                     {msg.timestamp}
+                    {msg.isSending && msg.isMe && " (Enviando...)"}
                   </p>
                 </div>
               </div>
@@ -215,7 +253,7 @@ const ChatWindow = ({ user, onBack }: ChatWindowProps) => {
         {/* Language tip */}
         <div className="px-4 py-2 bg-muted/30 border-t border-b">
           <p className="text-xs text-center text-muted-foreground">
-            💡 Practica en ambos idiomas: {user.idiomasNativos[0]} ↔ Español
+            💡 Practica en ambos idiomas: {partnerNativeLang} ↔ {myNativeLang}
           </p>
         </div>
 

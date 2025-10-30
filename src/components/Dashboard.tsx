@@ -25,7 +25,11 @@ type ViewType = "discover" | "matches" | "chat";
 // 1. Recibir userId como prop
 const Dashboard = ({ onLogout, userId }: DashboardProps) => {
   const navigate = useNavigate();
-  const { data: usuarios = [], isLoading: loading, error } = useUsuarios();
+  const {
+    data: usuarios = [],
+    isLoading: loading,
+    error,
+  } = useUsuarios(userId);
   const [currentUserIndex, setCurrentUserIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [matchedUser, setMatchedUser] = useState<User | null>(null);

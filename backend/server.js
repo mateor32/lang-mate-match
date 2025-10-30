@@ -81,12 +81,79 @@ app.use("/api/messages", messageRouter); // <-- NUEVO: Monta el router de mensaj
 app.post("/api/auth/google", googleAuth);
 
 app.get("/api/usuarios", async (req, res) => {
-  // ... (código existente del endpoint /api/usuarios)
-  try {
-    const usuariosResult = await pool.query("SELECT * FROM usuarios");
+  // MODIFICACIÓN CLAVE: Lee el parámetro de consulta 'recommendationsFor'
+  const { recommendationsFor } = req.query;
 
-    // Obtener los idiomas de cada usuario
-    // Obtener los idiomas de cada usuario con tipo
+  try {
+    let usuariosResult;
+
+    // Si se pide una lista de recomendaciones, aplicamos la lógica de matching
+    if (recommendationsFor) {
+      const loggedUserId = parseInt(recommendationsFor, 10);
+
+      // 1. Consulta SQL para obtener los IDs de los usuarios recomendados
+      const recommendationsQuery = `
+        SELECT
+            u.id
+        FROM
+            usuarios u
+        WHERE
+            u.id != $1
+            -- Excluir a los que el usuario logueado ya deslizó (se asume que los likes van a 'likes')
+            AND u.id NOT IN (SELECT usuario2_id FROM likes WHERE usuario1_id = $1)
+            
+            -- CRITERIO 1: Compatibilidad Mutua de Idiomas (Aprende/Nativo)
+            -- A Aprende (tipo 'aprender') el que B es Nativo (tipo 'nativo')
+            AND EXISTS (
+                SELECT 1 FROM usuario_idioma ui_a
+                JOIN usuario_idioma ui_b ON ui_a.idioma_id = ui_b.idioma_id
+                WHERE ui_a.usuario_id = $1
+                  AND ui_a.tipo = 'aprender'
+                  AND ui_b.usuario_id = u.id
+                  AND ui_b.tipo = 'nativo'
+            )
+            -- B Aprende (tipo 'aprender') el que A es Nativo (tipo 'nativo')
+            AND EXISTS (
+                SELECT 1 FROM usuario_idioma ui_b
+                JOIN usuario_idioma ui_a ON ui_b.idioma_id = ui_a.idioma_id
+                WHERE ui_b.usuario_id = u.id
+                  AND ui_b.tipo = 'aprender'
+                  AND ui_a.usuario_id = $1
+                  AND ui_a.tipo = 'nativo'
+            )
+
+            -- CRITERIO 2: Intereses Comunes (Al menos uno)
+            AND EXISTS (
+                SELECT 1 FROM usuario_interes ui_a
+                JOIN usuario_interes ui_b ON ui_a.interes_id = ui_b.interes_id
+                WHERE ui_a.usuario_id = $1
+                  AND ui_b.usuario_id = u.id
+            )
+        ORDER BY
+            u.id
+      `;
+
+      const recommendedIdsResult = await pool.query(recommendationsQuery, [
+        loggedUserId,
+      ]);
+      const recommendedIds = recommendedIdsResult.rows.map((row) => row.id);
+
+      if (recommendedIds.length === 0) {
+        return res.json([]);
+      }
+
+      // 2. Consulta los datos completos de los usuarios recomendados
+      // Usamos = ANY($1) para pasar un array de IDs a la consulta PostgreSQL
+      const placeholders = recommendedIds.map((_, i) => `$${i + 1}`).join(",");
+      const finalQuery = `SELECT * FROM usuarios WHERE id IN (${placeholders}) ORDER BY id`;
+
+      usuariosResult = await pool.query(finalQuery, recommendedIds);
+    } else {
+      // Comportamiento original: devolver todos los usuarios (e.g., para admin)
+      usuariosResult = await pool.query("SELECT * FROM usuarios");
+    }
+
+    // El resto de la lógica para obtener idiomas e intereses por usuario sigue siendo útil
     const usuariosConIdiomas = await Promise.all(
       usuariosResult.rows.map(async (usuario) => {
         const idiomasResult = await pool.query(
@@ -97,8 +164,9 @@ app.get("/api/usuarios", async (req, res) => {
           [usuario.id]
         );
 
+        // MODIFICACIÓN CLAVE: Seleccionar i.id y devolver toda la fila (rows)
         const interesesResult = await pool.query(
-          `SELECT i.nombre
+          `SELECT i.id, i.nombre
        FROM usuario_interes ui
        JOIN intereses i ON ui.interes_id = i.id
        WHERE ui.usuario_id = $1`,
@@ -108,11 +176,10 @@ app.get("/api/usuarios", async (req, res) => {
         return {
           ...usuario,
           usuario_idioma: idiomasResult.rows, // ahora trae tipo también
-          intereses: interesesResult.rows.map((r) => r.nombre),
+          intereses: interesesResult.rows, // <--- CORREGIDO: Devuelve array de {id, nombre}
         };
       })
     );
-
     res.json(usuariosConIdiomas);
   } catch (err) {
     console.error(err);

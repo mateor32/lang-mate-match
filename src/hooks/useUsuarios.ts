@@ -21,9 +21,12 @@ export interface Usuario {
 }
 
 // Función que realiza el fetch y la transformación de datos
-const fetchAndProcessUsuarios = async () => {
+// Función que realiza el fetch y la transformación de datos
+// MODIFICACIÓN: ACEPTA ID
+const fetchAndProcessUsuarios = async (currentUserId: number) => { 
     // 1. Fetch de todos los usuarios
-    const res = await fetch("http://localhost:5000/api/usuarios");
+    // MODIFICACIÓN: AÑADIR QUERY PARAM para activar lógica de recomendación en el backend
+    const res = await fetch(`http://localhost:5000/api/usuarios?recommendationsFor=${currentUserId}`);
     if (!res.ok) throw new Error("Error al cargar usuarios");
     const data: Usuario[] = await res.json();
 
@@ -32,22 +35,13 @@ const fetchAndProcessUsuarios = async () => {
         data.map(async (usuario) => {
           const user: User = usuarioToUser(usuario);
 
-          // Obtener intereses para el usuario
-          try {
-            const resIntereses = await fetch(
-              `http://localhost:5000/api/usuarios/${usuario.id}/intereses`
-            );
-            if (resIntereses.ok) {
-              const interesesData = await resIntereses.json();
-              // El campo 'intereses' de User ahora usará el formato { id, nombre }
-              user.intereses = interesesData.map((i: any) => ({ id: i.id, nombre: i.nombre }));
-            } else {
-              user.intereses = [];
-            }
-          } catch {
-            user.intereses = [];
-          }
-
+          // NOTA: El fetch N+1 de intereses se ha eliminado en este paso,
+          // ya que el backend modificado en server.js ahora devuelve los datos
+          // necesarios. Se mantiene la simple asignación.
+          
+          // La lógica original en este punto que llamaba a /intereses fue omitida
+          // porque la nueva versión de server.js ya adjunta los datos.
+          
           return user;
         })
     );
@@ -55,11 +49,12 @@ const fetchAndProcessUsuarios = async () => {
 };
 
 // Nuevo hook usando React Query
-export const useUsuarios = () => {
-  // CLAVE: 'allUsers' es el identificador de caché
+// MODIFICACIÓN: ACEPTA ID
+export const useUsuarios = (userId: number) => { 
+  // CLAVE: Añadimos userId a la clave de caché para que se refetchee si el ID cambia
   return useQuery<User[], Error>({
-    queryKey: ['allUsers'],
-    queryFn: fetchAndProcessUsuarios,
+    queryKey: ['allUsers', userId], // Clave única por usuario
+    queryFn: () => fetchAndProcessUsuarios(userId), // Llama con ID
     // La data será considerada "fresh" por un tiempo
     staleTime: 5 * 60 * 1000, 
   });

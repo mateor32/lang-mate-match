@@ -5,7 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Send, Smile, Paperclip, MoreVertical } from "lucide-react";
+import {
+  ArrowLeft,
+  Send,
+  Smile,
+  Paperclip,
+  MoreVertical,
+  X,
+} from "lucide-react";
+import { toast } from "@/components/ui/use-toast"; // <-- Añadir importación de toast aquí
 
 // Interfaz para el usuario (usando la estructura de datos del proyecto)
 interface User {
@@ -153,6 +161,51 @@ const ChatWindow = ({
     }
   };
 
+  const handleDeleteMatch = async () => {
+    if (!matchId) return;
+
+    if (
+      window.confirm(
+        `¿Estás seguro de que quieres eliminar el match con ${user.nombre}? Se perderá toda la conversación.`
+      )
+    ) {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/matches/${matchId}`,
+          {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+        if (!res.ok)
+          throw new Error("Error al eliminar el match en el backend");
+
+        // Mostrar notificación de éxito
+        toast({
+          title: "Match eliminado",
+          description: `El chat con ${user.nombre} ha sido eliminado.`,
+          variant: "default",
+        });
+
+        // 1. Invalidar caché del frontend para que desaparezca de la lista
+        // Nota: Esto requiere que el componente Dashboard (o superior)
+        // use React Query para el listado de matches y que invalide la query.
+        // Por ahora, solo usamos el callback onBack.
+
+        // 2. Volver a la lista de matches
+        onBack();
+      } catch (error) {
+        console.error("Error al eliminar match:", error);
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el match. Intenta de nuevo.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   // Obtener idiomas nativos para el header/tip
   const nativeLanguages =
     user.usuario_idioma
@@ -200,6 +253,15 @@ const ChatWindow = ({
 
             <Button variant="ghost" size="sm">
               <MoreVertical className="w-4 h-4" />
+            </Button>
+            {/* MODIFICACIÓN: Nuevo botón para eliminar el match (sustituyendo MoreVertical) */}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteMatch} // Llama a la nueva función
+              title="Eliminar match y chat"
+            >
+              <X className="w-4 h-4" />
             </Button>
           </div>
         </div>

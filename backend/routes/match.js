@@ -69,5 +69,39 @@ export default function matchRouter(pool) {
     }
   });
 
+  // DELETE: eliminar match por ID
+  router.delete("/:matchId", async (req, res) => {
+    const { matchId } = req.params;
+
+    // Validar que matchId sea un número
+    if (isNaN(matchId)) {
+      return res.status(400).json({ error: "matchId inválido" });
+    }
+
+    try {
+      // 1. Eliminar los mensajes asociados a este match (limpieza de datos)
+      // Se asume que la tabla 'messages' tiene una columna 'match_id'
+      await pool.query(`DELETE FROM messages WHERE match_id = $1`, [matchId]);
+
+      // 2. Eliminar el registro del match
+      const result = await pool.query(
+        `DELETE FROM matches WHERE id = $1 RETURNING *`,
+        [matchId]
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "Match no encontrado" });
+      }
+
+      res.json({
+        message: "Match y chat eliminados con éxito",
+        matchId: matchId,
+      });
+    } catch (err) {
+      console.error("ERROR SQL DELETE /matches/:matchId:", err);
+      res.status(500).json({ error: "Error al eliminar match" });
+    }
+  });
+
   return router;
 }

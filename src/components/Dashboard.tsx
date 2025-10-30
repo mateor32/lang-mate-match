@@ -4,7 +4,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Settings, MessageCircle, Heart, Search } from "lucide-react";
+import {
+  LogOut,
+  Settings,
+  MessageCircle,
+  Heart,
+  Search,
+  Crown,
+} from "lucide-react"; // Añadir Crown
 import { useNavigate } from "react-router-dom";
 
 import UserCard from "./UserCard";
@@ -172,7 +179,8 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
     setSelectedChatUser(null);
     setCurrentView("matches");
   };
-
+  // NUEVA FUNCIÓN DE NAVEGACIÓN
+  const handlePremium = () => navigate("/premium");
   // Se usa `matches` para el contador del badge (aunque en un proyecto real se sincronizaría con useMatches)
   const mockMatches = matches.map((user, index) => {
     const idiomasNativos =
@@ -258,6 +266,16 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                   </Badge>
                 )}
               </Button>
+              {/* NUEVO: Botón de Premium */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handlePremium}
+                title="Ver Planes Premium"
+              >
+                <Crown className="w-4 h-4 fill-yellow-500/50 text-yellow-500" />
+              </Button>
+              {/* FIN: Botón de Premium */}
               <Button
                 variant="ghost"
                 size="sm"

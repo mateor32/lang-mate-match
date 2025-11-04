@@ -34,7 +34,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
           },
           body: JSON.stringify({ token: idToken }),
         }
-      );*/
+      );aa*/
 
       if (!response.ok) {
         throw new Error("Fallo la verificación del token en el backend.");

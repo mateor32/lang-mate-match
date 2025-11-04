@@ -23,9 +23,8 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ token: idToken }),
-      });  
+      });*/
 
-      });222*/
       const response = await fetch(
         "https://lang-mate-match.onrender.com/api/auth/google",
         {

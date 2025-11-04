@@ -4,6 +4,7 @@ import { pool } from "../db.js";
 
 // Reemplace con su ID de cliente real de Google.
 const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID || // <-- ¡CAMBIO AQUÍ!
   "193035898327-1lbc2ik6jrduikdeuivdcknmfaducadk.apps.googleusercontent.com";
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 

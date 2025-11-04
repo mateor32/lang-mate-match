@@ -251,5 +251,5 @@ app.get("/api/usuario_idioma", async (req, res) => {
 app.use("/api/usuarios", usuariosRouter);
 
 // 🔹 Escuchar puerto después de todas las rutas
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));

@@ -25,7 +25,7 @@ const LoginPage = ({ onLogin }: LoginPageProps) => {
         body: JSON.stringify({ token: idToken }),
       });  
 
-      });*/
+      });S*/
       const response = await fetch(
         "https://lang-mate-match.onrender.com/api/auth/google",
         {

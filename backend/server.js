@@ -7,6 +7,9 @@ import matchRouter from "./routes/match.js";
 import messageRouter from "./routes/message.js"; // <-- NUEVO: Importa el router de mensajes
 import { googleAuth } from "./controllers/authController.js";
 
+import dotenv from "dotenv";
+dotenv.config();
+
 const { Pool } = pkg;
 
 const app = express();
@@ -14,12 +17,17 @@ app.use(express.json());
 app.use(cors());
 
 const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
+
+/*const pool = new Pool({
   user: "postgres",
   host: "localhost",
   database: "linguamatch",
   password: "password",
   port: 5432,
-});
+});*/
 
 app.post("/api/likes", async (req, res) => {
   const { swiper_id, swiped_id } = req.body;

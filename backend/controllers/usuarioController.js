@@ -190,3 +190,39 @@ export const updateIntereses = async (req, res) => {
       .json({ error: "Error interno del servidor al actualizar intereses" });
   }
 };
+
+export const checkPremiumStatus = async (req, res) => {
+  const { id } = req.params;
+  const userIdInt = parseInt(id, 10);
+
+  if (!userIdInt || isNaN(userIdInt)) {
+    return res.status(400).json({ error: "ID de usuario inválido" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT
+        s.plan_nombre,
+        s.fecha_fin
+      FROM
+        public.suscripciones s
+      WHERE
+        s.usuario_id = $1 AND s.fecha_fin > NOW() AND s.estado = 'activo'`,
+      [userIdInt]
+    );
+
+    if (result.rows.length > 0) {
+      const subscription = result.rows[0];
+      return res.json({
+        isPremium: true,
+        plan: subscription.plan_nombre,
+        expires: subscription.fecha_fin,
+      });
+    }
+
+    res.json({ isPremium: false, plan: "Gratis" });
+  } catch (err) {
+    console.error("Error al verificar estado Premium:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};

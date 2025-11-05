@@ -1,14 +1,14 @@
 import { pool } from "../db.js";
 
-// Límites definidos por plan
+// LÍMITES DE DEPURACIÓN BAJOS para pruebas inmediatas de restricción
 const LIKE_LIMITS = {
-  Gratis: 1,
-  Premium: 2,
-  "Super Premium": 3, // Ilimitado
+  Gratis: 1, // Restringe después del 1er like
+  Premium: 2, // Restringe después del 2do like
+  "Super Premium": Infinity, // Ilimitado
 };
 
 /**
- * Obtiene el plan actual del usuario (similar a checkPremiumStatus)
+ * Obtiene el plan actual del usuario (consulta la tabla suscripciones)
  */
 const getUserPlan = async (userId) => {
   const result = await pool.query(
@@ -28,7 +28,7 @@ const getUserPlan = async (userId) => {
 };
 
 /**
- * Maneja el registro de un nuevo like, aplicando los límites del plan.
+ * Middleware para manejar el registro de un nuevo like, aplicando los límites del plan.
  */
 export const handleLikeLimit = async (req, res, next) => {
   const swiperId = req.body.swiper_id; // El usuario que da like
@@ -46,7 +46,6 @@ export const handleLikeLimit = async (req, res, next) => {
 
   // Si el límite es infinito (Super Premium), pasamos directamente a la lógica de matching
   if (limit === Infinity) {
-    // Ejecuta el siguiente middleware (la lógica de registro del like/matching)
     return next();
   }
 
@@ -69,6 +68,7 @@ export const handleLikeLimit = async (req, res, next) => {
     const lastReset = new Date(last_like_reset);
 
     // Determinar si el contador debe reiniciarse (si la última vez fue ayer o antes)
+    // Compara solo la parte de la fecha (toDateString)
     const isNewDay = now.toDateString() !== lastReset.toDateString();
 
     let newCount = daily_likes_count;
@@ -81,9 +81,12 @@ export const handleLikeLimit = async (req, res, next) => {
     } else {
       // Si no es un nuevo día, verificar el límite
       if (daily_likes_count >= limit) {
+        // Enviar 403 Forbidden si el límite se ha alcanzado
         return res.status(403).json({
           error: "Límite de likes diario alcanzado.",
-          message: `Tu plan (${plan}) tiene un límite de ${limit} likes diarios.`,
+          message: `Tu plan (${plan}) tiene un límite de ${limit} likes diarios. Compra Premium para más likes.`,
+          count: daily_likes_count,
+          limit: limit,
         });
       }
       newCount++;
@@ -97,7 +100,7 @@ export const handleLikeLimit = async (req, res, next) => {
       [newCount, newResetTime, swiperIdInt]
     );
 
-    // Si todo es válido y actualizado, pasa a la lógica de registro del like/matching
+    // 4. Si todo es válido y actualizado, pasa a la lógica de registro del like/matching
     next();
   } catch (err) {
     console.error("Error en la verificación de límite de likes:", err);

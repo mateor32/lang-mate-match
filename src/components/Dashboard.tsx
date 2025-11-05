@@ -22,12 +22,19 @@ import ChatWindow from "./ChatWindow";
 import { useUsuarios, Usuario } from "@/hooks/useUsuarios";
 import { usuarioToUser, User } from "@/utils/usuarioToUser";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://localhost:10000" ||
+  "http://localhost:5000";
+
 interface DashboardProps {
   onLogout: () => void;
   userId: number; // CLAVE: La prop debe ser 'userId: number'
 }
 
 type ViewType = "discover" | "matches" | "chat";
+
+// **CLAVE: Definir URL Base para la API**
 
 // 1. Recibir userId como prop
 const Dashboard = ({ onLogout, userId }: DashboardProps) => {
@@ -49,7 +56,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
 
   useEffect(() => {
     // 2. Usamos el userId de la prop para el fetch (se evita el "undefined")
-    fetch(`http://localhost:5000/api/usuarios/${userId}`)
+    fetch(`${API_BASE_URL}/api/usuarios/${userId}`) // <-- URL CORREGIDA
       .then((res) => {
         if (!res.ok) {
           throw new Error(`HTTP error! Status: ${res.status}`);
@@ -93,7 +100,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
 
   const saveMatch = async (userId1: number, userId2: number) => {
     try {
-      const res = await fetch("http://localhost:5000/api/matches", {
+      const res = await fetch(`${API_BASE_URL}/api/matches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ usuario1_id: userId1, usuario2_id: userId2 }), // ✅ corregido
@@ -117,7 +124,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
         const userId2 = currentCardUser.id; // Usuario que recibe el "like"
 
         // 1. ENVIAR LIKE y CHEQUEAR MUTUALIDAD en el backend
-        const likeResponse = await fetch("http://localhost:5000/api/likes", {
+        const likeResponse = await fetch(`${API_BASE_URL}/api/likes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

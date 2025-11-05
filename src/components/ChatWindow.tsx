@@ -13,7 +13,12 @@ import {
   MoreVertical,
   X,
 } from "lucide-react";
-import { toast } from "@/components/ui/use-toast"; // <-- Añadir importación de toast aquí
+import { toast } from "@/components/ui/use-toast";
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://localhost:10000" ||
+  "http://localhost:5000"; // <-- Añadir importación de toast aquí
 
 // Interfaz para el usuario (usando la estructura de datos del proyecto)
 interface User {
@@ -73,7 +78,7 @@ const ChatWindow = ({
   const fetchMessages = useCallback(async () => {
     if (!matchId) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/messages/${matchId}`);
+      const res = await fetch(`${API_BASE_URL}/api/messages/${matchId}`);
       if (!res.ok) throw new Error("Error al cargar mensajes");
 
       const data: DbMessage[] = await res.json();
@@ -132,7 +137,7 @@ const ChatWindow = ({
       setMessage(""); // Limpiar el input
 
       try {
-        const res = await fetch("http://localhost:5000/api/messages", {
+        const res = await fetch(`${API_BASE_URL}/api/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -170,13 +175,10 @@ const ChatWindow = ({
       )
     ) {
       try {
-        const res = await fetch(
-          `http://localhost:5000/api/matches/${matchId}`,
-          {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-          }
-        );
+        const res = await fetch(`${API_BASE_URL}/api/matches/${matchId}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        });
 
         if (!res.ok)
           throw new Error("Error al eliminar el match en el backend");

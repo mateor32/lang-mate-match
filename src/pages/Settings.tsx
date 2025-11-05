@@ -11,6 +11,12 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
+// **CLAVE: Definir URL Base para la API**
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://localhost:10000" ||
+  "http://localhost:5000";
+
 // Definición de tipos para Idiomas e Intereses
 interface Resource {
   id: number;
@@ -92,8 +98,8 @@ export default function ProfileSettings() {
     try {
       // 1. Fetch recursos disponibles
       const [langRes, intRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/usuarios/idiomas`),
-        fetch(`${API_BASE_URL}/usuarios/intereses`),
+        fetch(`${API_BASE_URL}/api/usuarios/idiomas`), // <-- URL CORREGIDA
+        fetch(`${API_BASE_URL}/api/usuarios/intereses`), // <-- URL CORREGIDA
       ]);
       const availableLanguagesData = langRes.ok ? await langRes.json() : [];
       const availableInterestsData = intRes.ok ? await intRes.json() : [];
@@ -101,7 +107,7 @@ export default function ProfileSettings() {
       setAvailableInterests(availableInterestsData);
 
       // 2. Fetch datos del usuario logueado
-      const userRes = await fetch(`${API_BASE_URL}/usuarios/${userId}`);
+      const userRes = await fetch(`${API_BASE_URL}/api/usuarios/${userId}`); // <-- URL CORREGIDA
       if (!userRes.ok) throw new Error(`Error cargando usuario ${userId}`);
       const data = await userRes.json();
 
@@ -116,7 +122,7 @@ export default function ProfileSettings() {
         .map((i: any) => i.id);
 
       const interesesRes = await fetch(
-        `${API_BASE_URL}/usuarios/${userId}/intereses`
+        `${API_BASE_URL}/api/usuarios/${userId}/intereses` // <-- URL CORREGIDA
       );
       const interesesData = interesesRes.ok ? await interesesRes.json() : [];
       // Corregido: Usar i.id para mapear IDs
@@ -167,24 +173,27 @@ export default function ProfileSettings() {
   const onSubmit = async (data: ProfileFormValues) => {
     if (!userId) return;
     try {
-      const API_BASE_URL = "http://localhost:5000/api";
       // Asumiendo que data.foto contiene la URL actual (aunque sea el placeholder)
 
       // 1. Actualizar Perfil Básico
-      const basicUpdatePromise = fetch(`${API_BASE_URL}/usuarios/${userId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: data.nombre,
-          bio: data.bio,
-          pais: data.pais,
-          foto: data.foto,
-        }),
-      });
+      const basicUpdatePromise = fetch(
+        `${API_BASE_URL}/api/usuarios/${userId}`,
+        {
+          // <-- URL CORREGIDA
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: data.nombre,
+            bio: data.bio,
+            pais: data.pais,
+            foto: data.foto,
+          }),
+        }
+      );
 
       // 2. Actualizar Idiomas
       const langUpdatePromise = fetch(
-        `${API_BASE_URL}/usuarios/${userId}/idiomas`,
+        `${API_BASE_URL}/api/usuarios/${userId}/idiomas`, // <-- URL CORREGIDA
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -197,7 +206,7 @@ export default function ProfileSettings() {
 
       // 3. Actualizar Intereses
       const intUpdatePromise = fetch(
-        `${API_BASE_URL}/usuarios/${userId}/intereses`,
+        `${API_BASE_URL}/api/usuarios/${userId}/intereses`, // <-- URL CORREGIDA
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

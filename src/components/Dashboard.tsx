@@ -156,6 +156,14 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
           }),
         });
 
+        // 2. CLAVE: Manejar la respuesta de límite de likes
+        if (likeResponse.status === 403) {
+          const errorData = await likeResponse.json();
+          alert(errorData.message); // Usar toast o notificación real aquí
+          setIsAnimating(false);
+          return; // Detener el proceso si el límite se ha alcanzado
+        }
+
         if (!likeResponse.ok) {
           console.error("Error al registrar el like/chequear match");
           setIsAnimating(false);

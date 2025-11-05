@@ -2,9 +2,9 @@ import { pool } from "../db.js";
 
 // Límites definidos por plan
 const LIKE_LIMITS = {
-  Gratis: 10,
-  Premium: 50,
-  "Super Premium": Infinity, // Ilimitado
+  Gratis: 1,
+  Premium: 2,
+  "Super Premium": 3, // Ilimitado
 };
 
 /**

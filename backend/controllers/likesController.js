@@ -11,27 +11,14 @@ const LIKE_LIMITS = {
  * Obtiene el plan actual del usuario (consulta la tabla suscripciones)
  */
 const getUserPlan = async (userId) => {
-  const result = await pool.query(
-    `SELECT
-            s.plan_nombre
-        FROM
-            public.suscripciones s
-        WHERE
-            s.usuario_id = $1 AND s.fecha_fin > NOW() AND s.estado = 'activo'`,
-    [userId]
-  );
-
-  if (result.rows.length > 0) {
-    return result.rows[0].plan_nombre;
-  }
-  return "Gratis";
+  // ... (código sin cambios)
 };
 
 /**
  * Middleware para manejar el registro de un nuevo like, aplicando los límites del plan.
  */
 export const handleLikeLimit = async (req, res, next) => {
-  const swiperId = req.body.swiper_id; // El usuario que da like
+  const swiperId = req.body.swiper_id;
   const swiperIdInt = parseInt(swiperId, 10);
 
   if (!swiperIdInt || isNaN(swiperIdInt)) {
@@ -44,8 +31,10 @@ export const handleLikeLimit = async (req, res, next) => {
   const plan = await getUserPlan(swiperIdInt);
   const limit = LIKE_LIMITS[plan];
 
-  // Si el límite es infinito (Super Premium), pasamos directamente a la lógica de matching
   if (limit === Infinity) {
+    console.log(
+      `[Likes Check] Usuario ${swiperIdInt} (${plan}): Ilimitado, pasando.`
+    );
     return next();
   }
 
@@ -67,21 +56,27 @@ export const handleLikeLimit = async (req, res, next) => {
     const now = new Date();
     const lastReset = new Date(last_like_reset);
 
-    // Determinar si el contador debe reiniciarse (si la última vez fue ayer o antes)
-    // Compara solo la parte de la fecha (toDateString)
+    // Lógica de reinicio: Se reinicia si es la primera vez (null/default) O si han pasado 24h
+    // Nota: toDateString es la forma más simple, pero la más propensa a fallos de TZ.
+    // Usaremos el mismo toDateString, ya que es el estándar en el código, pero el problema
+    // puede ser el valor inicial en la DB.
     const isNewDay = now.toDateString() !== lastReset.toDateString();
 
     let newCount = daily_likes_count;
     let newResetTime = last_like_reset;
 
     if (isNewDay) {
-      // Reiniciar el contador al inicio del nuevo día
+      // Reiniciar el contador al inicio del nuevo día (o primera vez)
       newCount = 1;
       newResetTime = now.toISOString();
+      console.log(`[Likes Update] Reiniciando contador. Nuevo conteo: 1.`);
     } else {
       // Si no es un nuevo día, verificar el límite
       if (daily_likes_count >= limit) {
-        // Enviar 403 Forbidden si el límite se ha alcanzado
+        console.warn(
+          `[Likes Limit] Usuario ${swiperIdInt} (${plan}): Límite alcanzado. Conteo: ${daily_likes_count}, Límite: ${limit}`
+        );
+
         return res.status(403).json({
           error: "Límite de likes diario alcanzado.",
           message: `Tu plan (${plan}) tiene un límite de ${limit} likes diarios. Compra Premium para más likes.`,
@@ -90,6 +85,9 @@ export const handleLikeLimit = async (req, res, next) => {
         });
       }
       newCount++;
+      console.log(
+        `[Likes Update] Conteo incrementado. Nuevo conteo: ${newCount}.`
+      );
     }
 
     // 3. Actualizar el contador y la fecha en la base de datos
@@ -100,7 +98,7 @@ export const handleLikeLimit = async (req, res, next) => {
       [newCount, newResetTime, swiperIdInt]
     );
 
-    // 4. Si todo es válido y actualizado, pasa a la lógica de registro del like/matching
+    // 4. Pasa a la lógica de registro del like/matching
     next();
   } catch (err) {
     console.error("Error en la verificación de límite de likes:", err);

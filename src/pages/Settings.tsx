@@ -73,8 +73,6 @@ export default function ProfileSettings() {
     formState: { isSubmitting },
   } = form;
 
-  const API_BASE_URL = "http://localhost:5000/api";
-
   const handleSelection = (
     id: number,
     currentSelection: number[],

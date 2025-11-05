@@ -1,43 +1,58 @@
-// backend/controllers/premiumController.js
 import { pool } from "../db.js";
 
 /**
- * Simula la suscripción premium y actualiza el estado del usuario.
+ * Simula la suscripción premium insertando un registro en la tabla 'suscripciones'.
+ * Si el usuario ya tiene una suscripción activa, la renueva (actualiza fecha_fin).
  */
 export const subscribePremium = async (req, res) => {
-  const { userId, plan } = req.body; // 'plan' puede ser 'Premium' o 'Super Premium'
+  // Nota: El frontend te pasa el ID como string, por eso usamos parseInt.
+  const { userId, plan } = req.body;
+  const userIdInt = parseInt(userId, 10);
 
-  if (!userId) {
-    return res.status(400).json({ error: "Falta el ID de usuario." });
+  if (!userIdInt || isNaN(userIdInt)) {
+    return res
+      .status(400)
+      .json({ error: "Falta o es inválido el ID de usuario." });
   }
 
-  // NOTA: En una aplicación real, aquí integrarías Stripe/PayPal.
-  // Aquí solo simulamos el éxito.
+  // Calcular la fecha de expiración (30 días en el futuro)
+  const futureDate = new Date();
+  futureDate.setDate(futureDate.getDate() + 30);
+  const expirationDate = futureDate.toISOString();
 
   try {
-    // Actualizar la columna is_premium a TRUE en la tabla usuarios
+    // Utilizamos la cláusula ON CONFLICT DO UPDATE.
+    // Esto funciona porque la tabla 'suscripciones' tiene una restricción UNIQUE en 'usuario_id'.
     const result = await pool.query(
-      `UPDATE usuarios
-             SET is_premium = TRUE
-             WHERE id = $1
-             RETURNING id, is_premium, nombre`,
-      [userId]
+      `INSERT INTO public.suscripciones (usuario_id, plan_nombre, fecha_fin, estado)
+             VALUES ($1, $2, $3, 'activo')
+             ON CONFLICT (usuario_id) DO UPDATE
+             SET plan_nombre = $2,
+                 fecha_fin = $3,
+                 estado = 'activo',
+                 fecha_inicio = NOW()
+             RETURNING usuario_id, plan_nombre, fecha_fin`,
+      [userIdInt, plan, expirationDate]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Usuario no encontrado." });
-    }
+    const newSubscription = result.rows[0];
 
-    console.log(`[Premium] Usuario ${userId} suscrito al plan: ${plan}`);
+    console.log(
+      `[Premium] Usuario ${userIdInt} suscrito/renovado al plan: ${plan}`
+    );
 
     res.json({
       success: true,
-      userId: result.rows[0].id,
-      isPremium: result.rows[0].is_premium,
-      message: `¡Felicidades! Te has suscrito al plan ${plan}.`,
+      userId: newSubscription.usuario_id,
+      plan: newSubscription.plan_nombre,
+      // Formatear la fecha de expiración para el frontend (ejemplo)
+      message: `¡Felicidades! Tu suscripción ${plan} está activa hasta ${new Date(
+        newSubscription.fecha_fin
+      ).toLocaleDateString()}.`,
     });
   } catch (err) {
-    console.error("Error al suscribir a Premium:", err);
+    console.error("Error al suscribir a Premium (DB Error):", err);
+    // Devolvemos un error 500 y un mensaje genérico.
     res
       .status(500)
       .json({

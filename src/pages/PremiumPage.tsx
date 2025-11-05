@@ -10,6 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Check, ArrowLeft, Crown, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast"; // Para notificaciones
+
+// **CLAVE: Definir URL Base para la API**
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 // Definición de las características para cada plan
 interface PlanFeature {
@@ -114,6 +120,67 @@ const FeatureItem = ({
 
 export default function PremiumPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Obtener el ID del usuario logueado
+  const loggedUserId = localStorage.getItem("loggedUserId");
+  const userId = loggedUserId ? parseInt(loggedUserId, 10) : null;
+
+  // -----------------------------------------------------
+  // FUNCIÓN DE SUSCRIPCIÓN (Llama al nuevo endpoint del backend)
+  // -----------------------------------------------------
+  const handleSubscription = async (planTitle: string) => {
+    if (!userId) {
+      toast({
+        title: "Error de Sesión",
+        description:
+          "No se pudo identificar tu usuario. Inicia sesión de nuevo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Endpoint POST /api/premium/subscribe
+      const response = await fetch(`${API_BASE_URL}/api/premium/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, plan: planTitle }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Fallo la suscripción al plan.");
+      }
+
+      // Éxito: Muestra el toast y redirige
+      toast({
+        title: "Suscripción Exitosa",
+        description: data.message,
+        variant: "default",
+      });
+
+      // Simulación de recarga de datos de usuario para reflejar el cambio
+      localStorage.setItem("userIsPremium", "true");
+
+      // Esperar un momento y luego navegar de vuelta al dashboard
+      setTimeout(() => navigate("/"), 1000);
+    } catch (error: any) {
+      console.error("Error de suscripción:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message || "Ocurrió un error al procesar la suscripción.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto py-8">
@@ -189,9 +256,17 @@ export default function PremiumPage() {
                     : ""
                 )}
                 variant={plan.variant}
-                disabled={plan.title === "Gratis"}
+                // Deshabilitar si es Gratis O si ya está enviando una petición
+                disabled={plan.title === "Gratis" || isSubmitting}
+                onClick={
+                  plan.title !== "Gratis" && !isSubmitting
+                    ? () => handleSubscription(plan.title) // LLAMADA AL HANDLER
+                    : undefined
+                }
               >
-                {plan.buttonText}
+                {isSubmitting && plan.title !== "Gratis"
+                  ? "Procesando..."
+                  : plan.buttonText}
               </Button>
             </CardFooter>
           </Card>

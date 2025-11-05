@@ -6,6 +6,7 @@ import usuariosRouter from "./routes/usuarios.js";
 import matchRouter from "./routes/match.js";
 import messageRouter from "./routes/message.js"; // <-- NUEVO: Importa el router de mensajes
 import { googleAuth } from "./controllers/authController.js";
+import premiumRouter from "./routes/premium.js";
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -85,7 +86,7 @@ app.post("/api/likes", async (req, res) => {
 app.use("/api/usuarios", usuariosRouter);
 app.use("/api/matches", matchRouter(pool));
 app.use("/api/messages", messageRouter); // <-- NUEVO: Monta el router de mensajes
-
+app.use("/api/premium", premiumRouter);
 app.post("/api/auth/google", googleAuth);
 
 app.get("/api/usuarios", async (req, res) => {

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, ArrowLeft, Crown, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast"; // Para notificaciones
 
 // **CLAVE: Definir URL Base para la API**
@@ -122,13 +122,39 @@ export default function PremiumPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentUserPlan, setCurrentUserPlan] = useState<
+    "Gratis" | "Premium" | "Super Premium"
+  >("Gratis");
 
   // Obtener el ID del usuario logueado
   const loggedUserId = localStorage.getItem("loggedUserId");
   const userId = loggedUserId ? parseInt(loggedUserId, 10) : null;
 
+  // NUEVO: Obtener el plan actual al cargar la página (se ejecuta una vez)
+  useEffect(() => {
+    const fetchUserPlan = async () => {
+      if (!userId) return;
+      try {
+        // Llama al endpoint que creamos en el backend: /api/usuarios/:id/premium
+        const res = await fetch(
+          `${API_BASE_URL}/api/usuarios/${userId}/premium`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          // data.plan será 'Gratis', 'Premium' o 'Super Premium'
+          setCurrentUserPlan(
+            data.plan as "Gratis" | "Premium" | "Super Premium"
+          );
+        }
+      } catch (e) {
+        console.error("Error al obtener el plan actual:", e);
+      }
+    };
+    fetchUserPlan();
+  }, [userId]);
+
   // -----------------------------------------------------
-  // FUNCIÓN DE SUSCRIPCIÓN (Llama al nuevo endpoint del backend)
+  // FUNCIÓN DE SUSCRIPCIÓN
   // -----------------------------------------------------
   const handleSubscription = async (planTitle: string) => {
     if (!userId) {
@@ -144,7 +170,6 @@ export default function PremiumPage() {
     setIsSubmitting(true);
 
     try {
-      // Endpoint POST /api/premium/subscribe
       const response = await fetch(`${API_BASE_URL}/api/premium/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -157,24 +182,22 @@ export default function PremiumPage() {
         throw new Error(data.error || "Fallo la suscripción al plan.");
       }
 
-      // Éxito: Muestra el toast y redirige
+      // Éxito: Muestra el toast y actualiza el estado local del plan
       toast({
         title: "Suscripción Exitosa",
         description: data.message,
         variant: "default",
       });
 
-      // Simulación de recarga de datos de usuario para reflejar el cambio
-      localStorage.setItem("userIsPremium", "true");
+      setCurrentUserPlan(planTitle as "Premium" | "Super Premium"); // Actualizar estado del plan
 
-      // Esperar un momento y luego navegar de vuelta al dashboard
+      // Esperar un momento y luego navegar de vuelta
       setTimeout(() => navigate("/"), 1000);
     } catch (error: any) {
       console.error("Error de suscripción:", error);
       toast({
         title: "Error",
-        description:
-          error.message || "Ocurrió un error al procesar la suscripción.",
+        description: error.message || "Ocurrió un error al procesar el pago.",
         variant: "destructive",
       });
     } finally {
@@ -197,80 +220,91 @@ export default function PremiumPage() {
 
       {/* Pricing Cards */}
       <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-3">
-        {plans.map((plan) => (
-          <Card
-            key={plan.title}
-            className={cn(
-              "flex flex-col relative overflow-hidden",
-              plan.isPopular && "border-2 border-primary shadow-lg"
-            )}
-          >
-            {plan.isPopular && (
-              <Badge className="absolute top-0 right-0 rounded-none rounded-bl-lg bg-match text-white">
-                Más Popular
-              </Badge>
-            )}
-            <CardHeader className="text-center pb-2">
-              <CardTitle
-                className={cn(
-                  "flex justify-center items-center gap-2",
-                  plan.isPopular ? "text-primary" : "text-foreground"
-                )}
-              >
-                {plan.title}
-                {plan.isPopular && (
-                  <Zap className="w-5 h-5 fill-yellow-500 text-yellow-500" />
-                )}
-              </CardTitle>
-              <p className="text-4xl font-extrabold mt-2">
-                ${plan.price}
-                <span className="text-base font-normal text-muted-foreground">
-                  {plan.period}
-                </span>
-              </p>
-              <p className="text-sm text-muted-foreground pt-2">
-                {plan.description}
-              </p>
-            </CardHeader>
+        {plans.map((plan) => {
+          const isCurrentPlan = plan.title === currentUserPlan; // <-- CLAVE: ¿Es el plan actual?
 
-            <CardContent className="flex-1 space-y-3 pt-4">
-              <h4 className="text-sm font-semibold mb-3 border-b pb-1">
-                Incluye:
-              </h4>
-              {plan.features.map((feature, index) => (
-                <FeatureItem
-                  key={index}
-                  text={feature.text}
-                  isIncluded={feature.isIncluded}
-                  isPro={plan.isPopular}
-                />
-              ))}
-            </CardContent>
+          return (
+            <Card
+              key={plan.title}
+              className={cn(
+                "flex flex-col relative overflow-hidden",
+                plan.isPopular && "border-2 border-primary shadow-lg",
+                isCurrentPlan && "border-2 border-match" // <-- Resaltar el plan actual
+              )}
+            >
+              {plan.isPopular && (
+                <Badge className="absolute top-0 right-0 rounded-none rounded-bl-lg bg-match text-white">
+                  Más Popular
+                </Badge>
+              )}
+              <CardHeader className="text-center pb-2">
+                <CardTitle
+                  className={cn(
+                    "flex justify-center items-center gap-2",
+                    plan.isPopular ? "text-primary" : "text-foreground"
+                  )}
+                >
+                  {plan.title}
+                  {plan.isPopular && (
+                    <Zap className="w-5 h-5 fill-yellow-500 text-yellow-500" />
+                  )}
+                </CardTitle>
+                <p className="text-4xl font-extrabold mt-2">
+                  ${plan.price}
+                  <span className="text-base font-normal text-muted-foreground">
+                    {plan.period}
+                  </span>
+                </p>
+                <p className="text-sm text-muted-foreground pt-2">
+                  {plan.description}
+                </p>
+              </CardHeader>
 
-            <CardFooter className="pt-6">
-              <Button
-                className={cn(
-                  "w-full",
-                  plan.variant === "default"
-                    ? "bg-gradient-primary hover:opacity-90"
-                    : ""
-                )}
-                variant={plan.variant}
-                // Deshabilitar si es Gratis O si ya está enviando una petición
-                disabled={plan.title === "Gratis" || isSubmitting}
-                onClick={
-                  plan.title !== "Gratis" && !isSubmitting
-                    ? () => handleSubscription(plan.title) // LLAMADA AL HANDLER
-                    : undefined
-                }
-              >
-                {isSubmitting && plan.title !== "Gratis"
-                  ? "Procesando..."
-                  : plan.buttonText}
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
+              <CardContent className="flex-1 space-y-3 pt-4">
+                <h4 className="text-sm font-semibold mb-3 border-b pb-1">
+                  Incluye:
+                </h4>
+                {plan.features.map((feature, index) => (
+                  <FeatureItem
+                    key={index}
+                    text={feature.text}
+                    isIncluded={feature.isIncluded}
+                    isPro={plan.isPopular}
+                  />
+                ))}
+              </CardContent>
+
+              <CardFooter className="pt-6">
+                <Button
+                  className={cn(
+                    "w-full",
+                    isCurrentPlan
+                      ? "bg-match hover:bg-match/90"
+                      : plan.variant === "default"
+                      ? "bg-gradient-primary hover:opacity-90"
+                      : ""
+                  )}
+                  variant={isCurrentPlan ? "default" : plan.variant} // Usar default para el actual
+                  // Deshabilitar si es Gratis O si es el plan actual O si está enviando una petición
+                  disabled={
+                    plan.title === "Gratis" || isCurrentPlan || isSubmitting
+                  }
+                  onClick={
+                    !isCurrentPlan && plan.title !== "Gratis" && !isSubmitting
+                      ? () => handleSubscription(plan.title) // LLAMADA AL HANDLER
+                      : undefined
+                  }
+                >
+                  {isCurrentPlan
+                    ? "Plan Actual" // <-- CAMBIO DE TEXTO
+                    : isSubmitting && plan.title !== "Gratis"
+                    ? "Procesando..."
+                    : plan.buttonText}
+                </Button>
+              </CardFooter>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

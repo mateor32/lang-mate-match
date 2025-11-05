@@ -1,6 +1,9 @@
 // mateor32/lang-mate-match/mateor32-lang-mate-match-13c709073e7292ab8e58547abd2a20fbcfde7497/src/hooks/useMatches.ts
 import { useState, useEffect, ReactNode } from "react";
 import { usuarioToUser, User } from "@/utils/usuarioToUser";
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:10000"|| "http://localhost:5000" ;
 // Using the local Usuario interface declared at the end of this file instead of importing it.
 
 // NUEVA INTERFAZ para el match completo (incluye el ID del registro en la tabla matches)
@@ -19,7 +22,7 @@ export function useMatches(userId: number) {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`http://localhost:5000/api/matches/${userId}`)
+    fetch(`${API_BASE_URL}/api/matches/${userId}`)
       .then((res) => {
         if (!res.ok) throw new Error("Error al cargar lista de matches");
         return res.json();
@@ -31,7 +34,7 @@ export function useMatches(userId: number) {
               match.usuario1_id === userId ? match.usuario2_id : match.usuario1_id;
             
             // Se asume que el endpoint /api/usuarios/:id devuelve el mismo formato que useUsuarios espera
-            const res = await fetch(`http://localhost:5000/api/usuarios/${otherUserId}`);
+            const res = await fetch(`${API_BASE_URL}/api/usuarios/${otherUserId}`);
             if (!res.ok) throw new Error(`Error al cargar usuario ${otherUserId}`);
             
             // El endpoint /api/usuarios/:id en server.js devuelve { ...usuario, idiomas: [...] }

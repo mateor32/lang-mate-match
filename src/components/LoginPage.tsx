@@ -5,7 +5,7 @@ import { GoogleLogin } from "@react-oauth/google";
 interface LoginPageProps {
   onLogin: (userId: number) => void;
 }
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:10000";
 
 const LoginPage = ({ onLogin }: LoginPageProps) => {
   const handleSuccess = async (credentialResponse: any) => {

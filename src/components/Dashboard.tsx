@@ -21,6 +21,7 @@ import ChatWindow from "./ChatWindow";
 
 import { useUsuarios, Usuario } from "@/hooks/useUsuarios";
 import { usuarioToUser, User } from "@/utils/usuarioToUser";
+import { cn } from "@/lib/utils";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -53,24 +54,39 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null); // <-- NUEVO ESTADO
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userPlan, setUserPlan] = useState<
+    "Gratis" | "Premium" | "Super Premium"
+  >("Gratis");
 
   useEffect(() => {
     // 2. Usamos el userId de la prop para el fetch (se evita el "undefined")
-    fetch(`${API_BASE_URL}/api/usuarios/${userId}`) // <-- URL CORREGIDA
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! Status: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((data) => {
+    const fetchProfileData = async () => {
+      try {
+        // A. Obtener datos básicos del perfil
+        const resProfile = await fetch(
+          `${API_BASE_URL}/api/usuarios/${userId}`
+        );
+        if (!resProfile.ok)
+          throw new Error(`HTTP error! Status: ${resProfile.status}`);
+        const data = await resProfile.json();
+
+        // B. Obtener estado Premium (Nuevo Endpoint)
+        const resPremium = await fetch(
+          `${API_BASE_URL}/api/usuarios/${userId}/premium`
+        );
+        const premiumData = resPremium.ok
+          ? await resPremium.json()
+          : { isPremium: false, plan: "Gratis" };
+
+        // Adjuntar estado premium
+        setUserPlan(premiumData.plan);
+
         // Aseguramos que data.idiomas sea un array
         const idiomasArray = Array.isArray(data.idiomas) ? data.idiomas : [];
 
         const usuarioBD: User = {
           id: data.id,
           nombre: data.nombre,
-
           // 3. CLAVE: Usamos la foto real (columna 'foto' de su DB)
           foto:
             data.foto ||
@@ -79,15 +95,22 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
           usuario_idioma: idiomasArray.map((i: any, index: number) => ({
             nombre: i.nombre,
             id: data.id,
-            tipo: index === 0 ? "nativo" : "aprender", // el primero nativo, el resto aprender
+            tipo: i.tipo, // Asegurarse de usar el tipo real de la DB
           })),
-          edad: 0,
+          edad: data.fecha_nacimiento
+            ? new Date().getFullYear() -
+              new Date(data.fecha_nacimiento).getFullYear()
+            : 0,
           pais: data.pais || "",
           bio: data.bio || "",
         };
         setCurrentUser(usuarioBD);
-      })
-      .catch((err) => console.error(`Error cargando usuario ${userId}:`, err));
+      } catch (err) {
+        console.error(`Error cargando usuario ${userId}:`, err);
+      }
+    };
+
+    fetchProfileData();
   }, [userId]); // Dependencia clave
 
   if (!currentUser) return <p>Cargando perfil...</p>;
@@ -172,6 +195,12 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
   const handleBackToDiscover = () => {
     setCurrentView("discover");
     setSelectedChatUser(null);
+  };
+  // Función para obtener el color del badge del plan
+  const getPlanBadgeVariant = (plan: string) => {
+    if (plan === "Super Premium") return "bg-match text-white";
+    if (plan === "Premium") return "bg-primary/80 text-white";
+    return "bg-secondary text-secondary-foreground";
   };
 
   // CLAVE: Recibe el ID del match y el usuario para la ventana de chat
@@ -273,16 +302,21 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                   </Badge>
                 )}
               </Button>
-              {/* NUEVO: Botón de Premium */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handlePremium}
                 title="Ver Planes Premium"
               >
-                <Crown className="w-4 h-4 fill-yellow-500/50 text-yellow-500" />
+                <Crown
+                  className={cn(
+                    "w-4 h-4",
+                    userPlan !== "Gratis"
+                      ? "fill-match text-match"
+                      : "text-muted-foreground"
+                  )}
+                />
               </Button>
-              {/* FIN: Botón de Premium */}
               <Button
                 variant="ghost"
                 size="sm"

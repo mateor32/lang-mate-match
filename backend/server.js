@@ -7,7 +7,8 @@ import matchRouter from "./routes/match.js";
 import messageRouter from "./routes/message.js"; // <-- NUEVO: Importa el router de mensajes
 import { googleAuth } from "./controllers/authController.js";
 import premiumRouter from "./routes/premium.js";
-import likesRouter from "./routes/likes.js"; // <-- CORRECCIÓN: ajustada la capitalización para coincidir con el nombre real del fichero
+import likesRouter from "./routes/likes.js";
+import { Server } from "socket.io"; // // <-- CORRECCIÓN: ajustada la capitalización para coincidir con el nombre real del fichero
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -261,6 +262,78 @@ app.get("/api/usuario_idioma", async (req, res) => {
 
 app.use("/api/usuarios", usuariosRouter);
 
+// --- AÑADIR: Configuración y Eventos de Socket.io para la Señalización WebRTC ---
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // Permite conexiones desde el frontend de Vite (http://localhost:8080)
+    methods: ["GET", "POST"],
+  },
+});
+
+// Almacenamiento de IDs de sockets por ID de usuario
+const users = {};
+
+io.on("connection", (socket) => {
+  console.log("Nuevo cliente conectado:", socket.id);
+
+  // 1. Registro del usuario al conectarse
+  socket.on("user-connected", (userId) => {
+    users[userId] = socket.id;
+    console.log(`Usuario ${userId} conectado con socket ${socket.id}`);
+  });
+
+  // 2. Evento para iniciar una llamada (el remitente envía la oferta al receptor)
+  socket.on("call-user", ({ userToCallId, signal, from, name }) => {
+    const recipientSocketId = users[userToCallId];
+    if (recipientSocketId) {
+      // Reenviar la oferta de llamada al socket del destinatario
+      io.to(recipientSocketId).emit("receive-call", {
+        signal, // La oferta de WebRTC (SDP)
+        from, // ID del usuario que llama
+        name, // Nombre del usuario que llama
+      });
+    }
+  });
+
+  // 3. Evento para aceptar la llamada (el receptor envía la respuesta al remitente)
+  socket.on("accept-call", ({ signal, toId }) => {
+    const callerSocketId = users[toId];
+    if (callerSocketId) {
+      // Reenviar la respuesta de WebRTC (SDP) al socket del remitente
+      io.to(callerSocketId).emit("call-accepted", signal);
+    }
+  });
+
+  // 4. Intercambio de candidatos de red (ICE candidates)
+  socket.on("ice-candidate", ({ toId, candidate }) => {
+    const recipientSocketId = users[toId];
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit("ice-candidate", candidate);
+    }
+  });
+
+  // 5. Finalizar llamada o desconexión
+  socket.on("call-ended", ({ toId }) => {
+    const recipientSocketId = users[toId];
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit("call-ended");
+    }
+  });
+
+  socket.on("disconnect", () => {
+    // Lógica para limpiar el mapa de usuarios
+    for (const userId in users) {
+      if (users[userId] === socket.id) {
+        delete users[userId];
+        break;
+      }
+    }
+  });
+});
+
 // 🔹 Escuchar puerto después de todas las rutas
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+const httpServer = app.listen(PORT, () =>
+  console.log(`Servidor corriendo en puerto ${PORT}`)
+);
+//app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));

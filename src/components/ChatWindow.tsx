@@ -9,11 +9,14 @@ import {
   ArrowLeft,
   Send,
   Smile,
+  Video, // <-- NUEVO: Icono de videollamada
+  Phone, // <-- NUEVO: Icono de llamada de voz
   Paperclip,
   MoreVertical,
   X,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { io, Socket } from "socket.io-client";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -60,6 +63,10 @@ interface ChatWindowProps {
   onBack: () => void;
 }
 
+let socket: Socket;
+// Variable para almacenar la conexión WebRTC (se usaría PeerConnection en un caso real)
+const peerConnection: any = null; // Placeholder para RTCPeerConnection
+
 const ChatWindow = ({
   user,
   matchId,
@@ -69,6 +76,11 @@ const ChatWindow = ({
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isCalling, setIsCalling] = useState(false);
+  const [isCallActive, setIsCallActive] = useState(false);
+  // Refs para los streams de video (se usarían en un escenario real)
+  const myVideo = useRef(null);
+  const userVideo = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -101,6 +113,64 @@ const ChatWindow = ({
     }
   }, [matchId, currentUserId]);
 
+  // --- NUEVO: Conexión y Lógica de Señalización ---
+  useEffect(() => {
+    // 1. Conectar Socket.io y registrar al usuario
+    socket = io(API_BASE_URL);
+
+    socket.on("connect", () => {
+      // Enviar el ID del usuario logueado al backend para mapear socketId -> userId
+      socket.emit("user-connected", currentUserId);
+      console.log("Conectado al servidor de señalización.");
+    });
+
+    // 2. Escuchar la recepción de llamadas
+    socket.on("receive-call", ({ signal, from, name }) => {
+      // Mostrar alerta o modal al usuario para aceptar la llamada
+      const accept = window.confirm(
+        `${name} te está llamando, ¿quieres responder?`
+      );
+
+      if (accept) {
+        // Lógica para aceptar (iniciar WebRTC y enviar 'accept-call')
+        setIsCallActive(true);
+
+        // Aquí iría la lógica de WebRTC para crear la respuesta (SDP Answer)
+        const answerSignal = {
+          /* Generar respuesta SDP aquí */
+        };
+
+        socket.emit("accept-call", {
+          signal: answerSignal,
+          toId: from, // Devolver la respuesta al que llamó
+        });
+      }
+    });
+
+    // 3. Escuchar la aceptación de la llamada (el que llamó recibe la respuesta)
+    socket.on("call-accepted", (signal) => {
+      // Aquí iría la lógica de WebRTC para establecer la respuesta y empezar el stream
+      setIsCallActive(true);
+    });
+
+    // 4. Escuchar el intercambio de ICE candidates
+    socket.on("ice-candidate", (candidate) => {
+      // Aquí iría la lógica de WebRTC para añadir el candidato a la conexión
+      console.log("Recibido ICE candidate:", candidate);
+    });
+
+    // 5. Escuchar el fin de la llamada
+    socket.on("call-ended", () => {
+      setIsCallActive(false);
+      setIsCalling(false);
+      alert("La llamada ha finalizado.");
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [currentUserId, user.nombre]);
+
   // Ejecutar al cargar y cada vez que cambie el matchId
   useEffect(() => {
     fetchMessages();
@@ -110,6 +180,35 @@ const ChatWindow = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // --- NUEVA FUNCIÓN: Iniciar llamada ---
+  const handleInitiateCall = async (callType: "video" | "audio") => {
+    setIsCalling(true);
+
+    // 1. Obtener media stream (simulado)
+    // const stream = await navigator.mediaDevices.getUserMedia({ video: callType === 'video', audio: true });
+    // myVideo.current.srcObject = stream;
+
+    // 2. Generar oferta de WebRTC (SDP Offer)
+    const offerSignal = {
+      /* Generar oferta SDP aquí */
+    };
+
+    // 3. Enviar la señal de llamada al backend
+    socket.emit("call-user", {
+      userToCallId: user.id, // ID del compañero de chat
+      signal: offerSignal,
+      from: currentUserId,
+      name: currentUserId, // Suponiendo que el nombre del usuario logueado está disponible
+    });
+  };
+
+  // --- NUEVA FUNCIÓN: Colgar llamada ---
+  const handleEndCall = () => {
+    socket.emit("call-ended", { toId: user.id });
+    setIsCallActive(false);
+    setIsCalling(false);
+  };
 
   // Lógica para enviar mensajes a la API
   const handleSendMessage = async () => {
@@ -265,6 +364,36 @@ const ChatWindow = ({
             >
               <X className="w-4 h-4" />
             </Button>
+            {/* --- NUEVOS BOTONES DE LLAMADA --- */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleInitiateCall("audio")}
+              disabled={isCalling || isCallActive}
+              title="Llamada de Voz"
+            >
+              <Phone className="w-4 h-4 text-primary" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleInitiateCall("video")}
+              disabled={isCalling || isCallActive}
+              title="Videollamada"
+            >
+              <Video className="w-4 h-4 text-primary" />
+            </Button>
+
+            {isCallActive && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleEndCall}
+                title="Finalizar Llamada"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
 

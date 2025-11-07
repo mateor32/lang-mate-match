@@ -14,19 +14,9 @@ import {
   Paperclip,
   MoreVertical,
   X,
-  Volume2,
-  VideoIcon,
-  PhoneOff,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { io, Socket } from "socket.io-client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -64,16 +54,6 @@ interface Message extends DbMessage {
   timestamp: string;
   isMe: boolean;
   isSending?: boolean; // Para manejar el estado de envío en el frontend
-  // NUEVO: Campo para almacenar la traducción enviada (solo para el emisor)
-  translatedText?: string;
-}
-
-// NUEVA INTERFAZ PARA LLAMADA ENTRANTE
-interface IncomingCall {
-  signal: RTCSessionDescriptionInit;
-  from: number; // Caller ID
-  name: string; // Caller Name
-  callType: "video" | "audio";
 }
 
 interface ChatWindowProps {
@@ -82,45 +62,6 @@ interface ChatWindowProps {
   currentUserId: number; // ID del usuario logueado
   onBack: () => void;
 }
-
-// ===============================================
-// NUEVA LÓGICA DE TRADUCCIÓN (MOCK)
-// ===============================================
-
-/**
- * Simulación de un servicio de traducción asíncrono.
- * En un entorno real, esta función haría una llamada a la API de DeepL o Google Cloud Translation.
- * @param text - Texto a traducir.
- * @param fromLang - Idioma de origen (ej: 'Español').
- * @param toLang - Idioma de destino (ej: 'Inglés').
- * @returns El texto traducido o una simulación.
- */
-const mockTranslate = async (
-  text: string,
-  fromLang: string,
-  toLang: string
-): Promise<string> => {
-  // Simulación de un retraso de red
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  if (toLang === "Inglés" && fromLang === "Español") {
-    // Traducciones de ejemplo
-    if (text.toLowerCase().includes("hola")) return "Hello";
-    if (text.toLowerCase().includes("perfecto")) return "Perfect";
-    if (text.toLowerCase().includes("es interesante"))
-      return "That's interesting";
-  } else if (toLang === "Francés" && fromLang === "Español") {
-    if (text.toLowerCase().includes("hola")) return "Bonjour";
-  }
-
-  // Si no es el idioma nativo del match, enviamos el texto original sin traducir
-  if (toLang === "Nativo" || fromLang === toLang) {
-    return text;
-  }
-
-  // Simulación del resultado de la API de traducción
-  return `(Trad. a ${toLang}): ${text}`;
-};
 
 const ChatWindow = ({
   user,
@@ -133,8 +74,6 @@ const ChatWindow = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isCalling, setIsCalling] = useState(false);
   const [isCallActive, setIsCallActive] = useState(false);
-  // NUEVO ESTADO PARA LLAMADA ENTRANTE
-  const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
 
   // --- REFS para elementos mutables (Solución al ReferenceError) ---
   const socketRef = useRef<Socket | null>(null);
@@ -158,7 +97,7 @@ const ChatWindow = ({
   // LÓGICA DE WEBRTC (Núcleo)
   // -----------------------------------------------------
 
-  // Función para cerrar la conexión P2P y limpiar (stable)
+  // Función para cerrar la conexión P2P y limpiar
   const handleEndCall = useCallback(
     (emitEvent: boolean = true) => {
       if (emitEvent && socketRef.current) {
@@ -189,7 +128,7 @@ const ChatWindow = ({
     [user.id]
   );
 
-  // Obtener el stream de audio/video local (stable)
+  // Obtener el stream de audio/video local
   const getLocalStream = useCallback(async (callType: "video" | "audio") => {
     try {
       const constraints = {
@@ -215,7 +154,7 @@ const ChatWindow = ({
     }
   }, []);
 
-  // Configuración de la conexión P2P (stable)
+  // Configuración de la conexión P2P
   const setupPeerConnection = useCallback(
     (userToId: number) => {
       if (peerConnectionRef.current) {
@@ -262,7 +201,7 @@ const ChatWindow = ({
     [user.id]
   );
 
-  // Función para iniciar el proceso de llamada (stable)
+  // Función para iniciar el proceso de llamada
   const handleInitiateCall = useCallback(
     async (callType: "video" | "audio") => {
       if (isCalling || isCallActive || !socketRef.current) return;
@@ -295,12 +234,11 @@ const ChatWindow = ({
         });
       } catch (error) {
         console.error(error);
-        handleEndCall(false);
         toast({
           title: "Error de Llamada",
           description: "Fallo al iniciar la llamada.",
         });
-        setIsCalling(false);
+        handleEndCall(false);
       }
     },
     [
@@ -315,24 +253,42 @@ const ChatWindow = ({
     ]
   );
 
-  // Función para aceptar la llamada (lógica de Receptor) (stable)
-  const handleAcceptCall = useCallback(
-    async (callDetails: IncomingCall) => {
-      const { signal, from, callType, name } = callDetails;
-      setIncomingCall(null); // Cerrar modal
+  // -----------------------------------------------------
+  // EFECTOS Y SOCKET.IO (Señalización)
+  // -----------------------------------------------------
+  useEffect(() => {
+    // 1. Inicializar Socket.io y registrar al usuario
+    socketRef.current = io(API_BASE_URL, {
+      path: "/api/socket.io/",
+    });
 
-      // Utilizamos socketRef.current directamente
-      if (!socketRef.current || isCallActive) return;
+    const currentSocket = socketRef.current;
 
-      setIsCalling(true);
-      const currentSocket = socketRef.current;
+    currentSocket.on("connect", () => {
+      currentSocket.emit("user-connected", currentUserId);
+    });
 
-      try {
+    // 2. Recibir Llamada (Responder)
+    const onReceiveCall = async ({
+      signal,
+      from,
+      name,
+      callType,
+    }: {
+      signal: RTCSessionDescriptionInit;
+      from: number;
+      name: string;
+      callType: "video" | "audio";
+    }) => {
+      const accept = window.confirm(
+        `Llamada entrante de ${name} (${callType}). ¿Aceptar?`
+      );
+
+      if (accept) {
+        setIsCallActive(true);
+
         const stream = await getLocalStream(callType);
-        if (!stream) {
-          setIsCalling(false);
-          return handleEndCall(false);
-        }
+        if (!stream) return handleEndCall(false);
 
         const pc = setupPeerConnection(from);
 
@@ -349,48 +305,13 @@ const ChatWindow = ({
           title: "Llamada aceptada",
           description: `Iniciando con ${name}`,
         });
-        setIsCallActive(true);
-        setIsCalling(false);
-      } catch (e) {
-        console.error("Error al aceptar llamada:", e);
-        toast({
-          title: "Error",
-          description: "Fallo al conectar la llamada.",
-          variant: "destructive",
-        });
-        handleEndCall(false);
-        setIsCalling(false);
+      } else {
+        // Lógica de rechazo
       }
-    },
-    [isCallActive, getLocalStream, setupPeerConnection, handleEndCall]
-  );
+    };
 
-  // Función para rechazar la llamada (lógica de Receptor) (stable)
-  const handleRejectCall = useCallback((callDetails: IncomingCall) => {
-    setIncomingCall(null); // Cerrar modal
-
-    // Emitir un evento de finalización de llamada al remitente
-    if (socketRef.current) {
-      socketRef.current.emit("call-ended", { toId: callDetails.from });
-      toast({
-        title: "Llamada Rechazada",
-        description: `Has rechazado la llamada de ${callDetails.name}.`,
-        variant: "destructive",
-      });
-    }
-  }, []);
-
-  // **Nuevos Handlers de Socket.io envueltos en useCallback para estabilidad**
-  const onReceiveCall = useCallback(
-    ({ signal, from, name, callType }: IncomingCall) => {
-      // La única dependencia mutable es el setter de estado, que es estable.
-      setIncomingCall({ signal, from, name, callType });
-    },
-    [setIncomingCall]
-  );
-
-  const onCallAccepted = useCallback(
-    async (signal: RTCSessionDescriptionInit) => {
+    // 3. Aceptación de Llamada (Iniciador)
+    const onCallAccepted = async (signal: RTCSessionDescriptionInit) => {
       setIsCallActive(true);
       setIsCalling(false);
       await peerConnectionRef.current?.setRemoteDescription(
@@ -400,38 +321,22 @@ const ChatWindow = ({
         title: "Conectado",
         description: `Llamada con ${user.nombre} iniciada.`,
       });
-    },
-    [user.nombre, setIsCallActive, setIsCalling]
-  );
+    };
 
-  const onICECandidate = useCallback((candidate: RTCIceCandidate) => {
-    try {
-      peerConnectionRef.current?.addIceCandidate(candidate);
-    } catch (e) {
-      console.error("Error añadiendo ICE candidate:", e);
-    }
-  }, []);
+    // 4. ICE Candidates
+    const onICECandidate = (candidate: RTCIceCandidate) => {
+      try {
+        peerConnectionRef.current?.addIceCandidate(candidate);
+      } catch (e) {
+        console.error("Error añadiendo ICE candidate:", e);
+      }
+    };
 
-  const onCallEnded = useCallback(() => {
-    handleEndCall(false);
-  }, [handleEndCall]);
+    // 5. Finalizar Llamada
+    const onCallEnded = () => {
+      handleEndCall(false);
+    };
 
-  // -----------------------------------------------------
-  // EFECTOS Y SOCKET.IO (Corregido: Ejecuta solo una vez)
-  // -----------------------------------------------------
-  useEffect(() => {
-    // 1. Inicializar Socket.io y registrar al usuario
-    socketRef.current = io(API_BASE_URL, {
-      path: "/api/socket.io/",
-    });
-
-    const currentSocket = socketRef.current;
-
-    currentSocket.on("connect", () => {
-      currentSocket.emit("user-connected", currentUserId);
-    });
-
-    // 2. Registrar Listeners (usando las funciones estables de useCallback)
     currentSocket.on("receive-call", onReceiveCall);
     currentSocket.on("call-accepted", onCallAccepted);
     currentSocket.on("ice-candidate", onICECandidate);
@@ -444,15 +349,14 @@ const ChatWindow = ({
       currentSocket.off("ice-candidate", onICECandidate);
       currentSocket.off("call-ended", onCallEnded);
       currentSocket.disconnect();
+      // handleEndCall(false); // La limpieza ya se hace en el handler del socket.
     };
-    // **CORRECCIÓN CLAVE:** El array de dependencias ahora solo incluye
-    // currentUserId y las funciones de callback estables.
   }, [
     currentUserId,
-    onReceiveCall,
-    onCallAccepted,
-    onICECandidate,
-    onCallEnded,
+    getLocalStream,
+    setupPeerConnection,
+    handleEndCall,
+    user.nombre,
   ]);
 
   // Lógica para obtener mensajes de la API
@@ -495,40 +399,23 @@ const ChatWindow = ({
   // Lógica para enviar mensajes a la API
   const handleSendMessage = async () => {
     if (message.trim()) {
-      const originalMessage = message.trim();
-      let messageToSend = originalMessage;
-      let translatedMessage: string | undefined = undefined;
+      const messageToSend = message.trim();
 
-      // 1. **Determinar y Traducir el Mensaje**
-      const targetLang = partnerNativeLang;
-
-      // Si el idioma nativo del match es diferente al idioma asumido del usuario ("Español"), traducir.
-      if (targetLang !== myNativeLang) {
-        // Llamada simulada a la API de traducción
-        messageToSend = await mockTranslate(
-          originalMessage,
-          myNativeLang,
-          targetLang
-        );
-        translatedMessage = messageToSend; // Guardamos la traducción para mostrarla al emisor
-      }
-
-      // 2. Mensaje temporal (Optimistic update)
+      // 1. Mensaje temporal (Optimistic update)
       const tempId = Date.now();
       const tempMessage: Message = {
         id: tempId,
         match_id: matchId,
         sender_id: currentUserId,
-        message: originalMessage, // Mostrar el texto original en la burbuja principal del emisor
-        text: originalMessage,
-        translatedText: translatedMessage, // Nuevo campo
+        message: messageToSend,
+        created_at: new Date().toISOString(),
+        text: messageToSend,
         timestamp: new Date().toLocaleTimeString("es-ES", {
           hour: "2-digit",
           minute: "2-digit",
         }),
         isMe: true,
         isSending: true,
-        created_at: "",
       };
 
       setMessages((prev) => [...prev, tempMessage]);
@@ -541,18 +428,17 @@ const ChatWindow = ({
           body: JSON.stringify({
             match_id: matchId,
             sender_id: currentUserId,
-            // 3. **Enviar al Backend el Mensaje Traducido**
             message: messageToSend,
           }),
         });
 
         if (!res.ok) throw new Error("Error al enviar el mensaje al backend");
 
-        // 4. Éxito: Recargar mensajes para obtener el ID real de la DB
+        // 2. Éxito: Recargar mensajes para obtener el ID real de la DB
         await fetchMessages();
       } catch (error) {
         console.error("Error al enviar mensaje:", error);
-        // 5. Fallo: Revertir el mensaje temporal
+        // 3. Fallo: Revertir el mensaje temporal
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
       }
     }
@@ -612,69 +498,8 @@ const ChatWindow = ({
 
   const myNativeLang = "Español";
 
-  const callerFallback = incomingCall?.name.charAt(0) || "?";
-
-  const IncomingCallDialog = (
-    <Dialog
-      open={incomingCall !== null}
-      // Si el usuario cierra el modal (onOpenChange=false), se rechaza la llamada.
-      onOpenChange={(open) =>
-        !open && incomingCall && handleRejectCall(incomingCall)
-      }
-    >
-      <DialogContent className="sm:max-w-[425px] p-8">
-        <DialogHeader className="text-center space-y-4">
-          <div className="flex justify-center">
-            <Avatar className="w-20 h-20 shadow-lg">
-              {/* Usamos la foto del match como referencia para el caller */}
-              <AvatarImage src={user.foto} alt={incomingCall?.name} />
-              <AvatarFallback className="text-3xl bg-match/30 text-match">
-                {callerFallback}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-          <DialogTitle className="text-2xl flex items-center justify-center gap-2">
-            Llamada {incomingCall?.callType === "video" ? "de Video" : "de Voz"}{" "}
-            Entrante
-          </DialogTitle>
-          <DialogDescription className="text-lg font-semibold text-foreground">
-            {incomingCall?.name}
-          </DialogDescription>
-          <p className="text-muted-foreground">
-            ¿Quieres aceptar la llamada y empezar a practicar?
-          </p>
-        </DialogHeader>
-
-        <div className="flex justify-center gap-4 pt-4">
-          <Button
-            variant="destructive"
-            onClick={() => incomingCall && handleRejectCall(incomingCall)}
-            className="flex-1"
-            size="lg"
-          >
-            <PhoneOff className="w-5 h-5 mr-2" />
-            Rechazar
-          </Button>
-          <Button
-            onClick={() => incomingCall && handleAcceptCall(incomingCall)}
-            className="flex-1 bg-green-500 hover:bg-green-600"
-            size="lg"
-          >
-            {incomingCall?.callType === "video" ? (
-              <VideoIcon className="w-5 h-5 mr-2" />
-            ) : (
-              <Volume2 className="w-5 h-5 mr-2" />
-            )}
-            Aceptar
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-
   return (
     <div className="max-w-md mx-auto">
-      {IncomingCallDialog} {/* Renderizar la modal de llamada */}
       <Card className="h-[600px] flex flex-col">
         {/* Header */}
         <div className="p-4 border-b bg-card">
@@ -811,15 +636,6 @@ const ChatWindow = ({
                     }`}
                   >
                     <p className="text-sm leading-relaxed">{msg.text}</p>
-                    {/* NUEVO: Muestra la traducción para el emisor */}
-                    {msg.isMe &&
-                      msg.translatedText &&
-                      msg.translatedText !== msg.text && (
-                        <p className="text-xs opacity-80 mt-1">
-                          Enviado como: "{msg.translatedText}"
-                        </p>
-                      )}
-                    {/* FIN NUEVO */}
                   </div>
                   <p
                     className={`text-xs text-muted-foreground px-1 ${
@@ -852,7 +668,7 @@ const ChatWindow = ({
 
             <div className="flex-1 relative">
               <Input
-                placeholder={`Escribe un mensaje (Se traduce a ${partnerNativeLang})...`}
+                placeholder="Escribe un mensaje..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}

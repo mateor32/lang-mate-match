@@ -14,9 +14,19 @@ import {
   Paperclip,
   MoreVertical,
   X,
+  Volume2,
+  VideoIcon,
+  PhoneOff,
 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { io, Socket } from "socket.io-client";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -56,6 +66,14 @@ interface Message extends DbMessage {
   isSending?: boolean; // Para manejar el estado de envío en el frontend
 }
 
+// NUEVA INTERFAZ PARA LLAMADA ENTRANTE
+interface IncomingCall {
+  signal: RTCSessionDescriptionInit;
+  from: number; // Caller ID
+  name: string; // Caller Name
+  callType: "video" | "audio";
+}
+
 interface ChatWindowProps {
   user: User;
   matchId: number; // ID del match (registro en la tabla 'matches')
@@ -74,6 +92,8 @@ const ChatWindow = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isCalling, setIsCalling] = useState(false);
   const [isCallActive, setIsCallActive] = useState(false);
+  // NUEVO ESTADO PARA LLAMADA ENTRANTE
+  const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
 
   // --- REFS para elementos mutables (Solución al ReferenceError) ---
   const socketRef = useRef<Socket | null>(null);
@@ -97,7 +117,7 @@ const ChatWindow = ({
   // LÓGICA DE WEBRTC (Núcleo)
   // -----------------------------------------------------
 
-  // Función para cerrar la conexión P2P y limpiar
+  // Función para cerrar la conexión P2P y limpiar (stable)
   const handleEndCall = useCallback(
     (emitEvent: boolean = true) => {
       if (emitEvent && socketRef.current) {
@@ -128,7 +148,7 @@ const ChatWindow = ({
     [user.id]
   );
 
-  // Obtener el stream de audio/video local
+  // Obtener el stream de audio/video local (stable)
   const getLocalStream = useCallback(async (callType: "video" | "audio") => {
     try {
       const constraints = {
@@ -154,7 +174,7 @@ const ChatWindow = ({
     }
   }, []);
 
-  // Configuración de la conexión P2P
+  // Configuración de la conexión P2P (stable)
   const setupPeerConnection = useCallback(
     (userToId: number) => {
       if (peerConnectionRef.current) {
@@ -201,7 +221,7 @@ const ChatWindow = ({
     [user.id]
   );
 
-  // Función para iniciar el proceso de llamada
+  // Función para iniciar el proceso de llamada (stable)
   const handleInitiateCall = useCallback(
     async (callType: "video" | "audio") => {
       if (isCalling || isCallActive || !socketRef.current) return;
@@ -253,42 +273,24 @@ const ChatWindow = ({
     ]
   );
 
-  // -----------------------------------------------------
-  // EFECTOS Y SOCKET.IO (Señalización)
-  // -----------------------------------------------------
-  useEffect(() => {
-    // 1. Inicializar Socket.io y registrar al usuario
-    socketRef.current = io(API_BASE_URL, {
-      path: "/api/socket.io/",
-    });
+  // Función para aceptar la llamada (lógica de Receptor) (stable)
+  const handleAcceptCall = useCallback(
+    async (callDetails: IncomingCall) => {
+      const { signal, from, callType, name } = callDetails;
+      setIncomingCall(null); // Cerrar modal
 
-    const currentSocket = socketRef.current;
+      // Utilizamos socketRef.current directamente
+      if (!socketRef.current || isCallActive) return;
 
-    currentSocket.on("connect", () => {
-      currentSocket.emit("user-connected", currentUserId);
-    });
+      setIsCalling(true);
+      const currentSocket = socketRef.current;
 
-    // 2. Recibir Llamada (Responder)
-    const onReceiveCall = async ({
-      signal,
-      from,
-      name,
-      callType,
-    }: {
-      signal: RTCSessionDescriptionInit;
-      from: number;
-      name: string;
-      callType: "video" | "audio";
-    }) => {
-      const accept = window.confirm(
-        `Llamada entrante de ${name} (${callType}). ¿Aceptar?`
-      );
-
-      if (accept) {
-        setIsCallActive(true);
-
+      try {
         const stream = await getLocalStream(callType);
-        if (!stream) return handleEndCall(false);
+        if (!stream) {
+          setIsCalling(false);
+          return handleEndCall(false);
+        }
 
         const pc = setupPeerConnection(from);
 
@@ -305,13 +307,48 @@ const ChatWindow = ({
           title: "Llamada aceptada",
           description: `Iniciando con ${name}`,
         });
-      } else {
-        // Lógica de rechazo
+        setIsCallActive(true);
+        setIsCalling(false);
+      } catch (e) {
+        console.error("Error al aceptar llamada:", e);
+        toast({
+          title: "Error",
+          description: "Fallo al conectar la llamada.",
+          variant: "destructive",
+        });
+        handleEndCall(false);
+        setIsCalling(false);
       }
-    };
+    },
+    [isCallActive, getLocalStream, setupPeerConnection, handleEndCall]
+  );
 
-    // 3. Aceptación de Llamada (Iniciador)
-    const onCallAccepted = async (signal: RTCSessionDescriptionInit) => {
+  // Función para rechazar la llamada (lógica de Receptor) (stable)
+  const handleRejectCall = useCallback((callDetails: IncomingCall) => {
+    setIncomingCall(null); // Cerrar modal
+
+    // Emitir un evento de finalización de llamada al remitente
+    if (socketRef.current) {
+      socketRef.current.emit("call-ended", { toId: callDetails.from });
+      toast({
+        title: "Llamada Rechazada",
+        description: `Has rechazado la llamada de ${callDetails.name}.`,
+        variant: "destructive",
+      });
+    }
+  }, []);
+
+  // **Nuevos Handlers de Socket.io envueltos en useCallback para estabilidad**
+  const onReceiveCall = useCallback(
+    ({ signal, from, name, callType }: IncomingCall) => {
+      // La única dependencia mutable es el setter de estado, que es estable.
+      setIncomingCall({ signal, from, name, callType });
+    },
+    [setIncomingCall]
+  );
+
+  const onCallAccepted = useCallback(
+    async (signal: RTCSessionDescriptionInit) => {
       setIsCallActive(true);
       setIsCalling(false);
       await peerConnectionRef.current?.setRemoteDescription(
@@ -321,22 +358,38 @@ const ChatWindow = ({
         title: "Conectado",
         description: `Llamada con ${user.nombre} iniciada.`,
       });
-    };
+    },
+    [user.nombre, setIsCallActive, setIsCalling]
+  );
 
-    // 4. ICE Candidates
-    const onICECandidate = (candidate: RTCIceCandidate) => {
-      try {
-        peerConnectionRef.current?.addIceCandidate(candidate);
-      } catch (e) {
-        console.error("Error añadiendo ICE candidate:", e);
-      }
-    };
+  const onICECandidate = useCallback((candidate: RTCIceCandidate) => {
+    try {
+      peerConnectionRef.current?.addIceCandidate(candidate);
+    } catch (e) {
+      console.error("Error añadiendo ICE candidate:", e);
+    }
+  }, []);
 
-    // 5. Finalizar Llamada
-    const onCallEnded = () => {
-      handleEndCall(false);
-    };
+  const onCallEnded = useCallback(() => {
+    handleEndCall(false);
+  }, [handleEndCall]);
 
+  // -----------------------------------------------------
+  // EFECTOS Y SOCKET.IO (Corregido: Ejecuta solo una vez)
+  // -----------------------------------------------------
+  useEffect(() => {
+    // 1. Inicializar Socket.io y registrar al usuario
+    socketRef.current = io(API_BASE_URL, {
+      path: "/api/socket.io/",
+    });
+
+    const currentSocket = socketRef.current;
+
+    currentSocket.on("connect", () => {
+      currentSocket.emit("user-connected", currentUserId);
+    });
+
+    // 2. Registrar Listeners (usando las funciones estables de useCallback)
     currentSocket.on("receive-call", onReceiveCall);
     currentSocket.on("call-accepted", onCallAccepted);
     currentSocket.on("ice-candidate", onICECandidate);
@@ -349,14 +402,15 @@ const ChatWindow = ({
       currentSocket.off("ice-candidate", onICECandidate);
       currentSocket.off("call-ended", onCallEnded);
       currentSocket.disconnect();
-      // handleEndCall(false); // La limpieza ya se hace en el handler del socket.
     };
+    // **CORRECCIÓN CLAVE:** El array de dependencias ahora solo incluye
+    // currentUserId y las funciones de callback estables.
   }, [
     currentUserId,
-    getLocalStream,
-    setupPeerConnection,
-    handleEndCall,
-    user.nombre,
+    onReceiveCall,
+    onCallAccepted,
+    onICECandidate,
+    onCallEnded,
   ]);
 
   // Lógica para obtener mensajes de la API
@@ -498,8 +552,69 @@ const ChatWindow = ({
 
   const myNativeLang = "Español";
 
+  const callerFallback = incomingCall?.name.charAt(0) || "?";
+
+  const IncomingCallDialog = (
+    <Dialog
+      open={incomingCall !== null}
+      // Si el usuario cierra el modal (onOpenChange=false), se rechaza la llamada.
+      onOpenChange={(open) =>
+        !open && incomingCall && handleRejectCall(incomingCall)
+      }
+    >
+      <DialogContent className="sm:max-w-[425px] p-8">
+        <DialogHeader className="text-center space-y-4">
+          <div className="flex justify-center">
+            <Avatar className="w-20 h-20 shadow-lg">
+              {/* Usamos la foto del match como referencia para el caller */}
+              <AvatarImage src={user.foto} alt={incomingCall?.name} />
+              <AvatarFallback className="text-3xl bg-match/30 text-match">
+                {callerFallback}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+          <DialogTitle className="text-2xl flex items-center justify-center gap-2">
+            Llamada {incomingCall?.callType === "video" ? "de Video" : "de Voz"}{" "}
+            Entrante
+          </DialogTitle>
+          <DialogDescription className="text-lg font-semibold text-foreground">
+            {incomingCall?.name}
+          </DialogDescription>
+          <p className="text-muted-foreground">
+            ¿Quieres aceptar la llamada y empezar a practicar?
+          </p>
+        </DialogHeader>
+
+        <div className="flex justify-center gap-4 pt-4">
+          <Button
+            variant="destructive"
+            onClick={() => incomingCall && handleRejectCall(incomingCall)}
+            className="flex-1"
+            size="lg"
+          >
+            <PhoneOff className="w-5 h-5 mr-2" />
+            Rechazar
+          </Button>
+          <Button
+            onClick={() => incomingCall && handleAcceptCall(incomingCall)}
+            className="flex-1 bg-green-500 hover:bg-green-600"
+            size="lg"
+          >
+            {incomingCall?.callType === "video" ? (
+              <VideoIcon className="w-5 h-5 mr-2" />
+            ) : (
+              <Volume2 className="w-5 h-5 mr-2" />
+            )}
+            Aceptar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
     <div className="max-w-md mx-auto">
+      {IncomingCallDialog} {/* Renderizar la modal de llamada */}
       <Card className="h-[600px] flex flex-col">
         {/* Header */}
         <div className="p-4 border-b bg-card">

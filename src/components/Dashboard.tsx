@@ -471,7 +471,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
         </div>
       </div>
 
-      {/* Match modal */}
+      {/* Matchcdd modal */}
       {matchedUser && (
         <MatchModal user={matchedUser} onClose={closeMatchModal} />
       )}

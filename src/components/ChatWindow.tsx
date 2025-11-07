@@ -63,18 +63,6 @@ interface ChatWindowProps {
   onBack: () => void;
 }
 
-// WebRTC Configuration
-const iceServers = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" }, // Servidor STUN público de Google
-  ],
-};
-
-let socket: Socket;
-let peerConnection: RTCPeerConnection | null = null;
-let localStream: MediaStream | null = null;
-let remoteStream: MediaStream | null = null;
-
 const ChatWindow = ({
   user,
   matchId,
@@ -87,9 +75,19 @@ const ChatWindow = ({
   const [isCalling, setIsCalling] = useState(false);
   const [isCallActive, setIsCallActive] = useState(false);
 
+  // --- REFS para elementos mutables (Solución al ReferenceError) ---
+  const socketRef = useRef<Socket | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
+
   const myAudio = useRef<HTMLAudioElement | null>(null);
   const userAudio = useRef<HTMLAudioElement | null>(null);
-  const currentUserName = "Mi Usuario"; // Placeholder: Idealmente se obtendría del estado de autenticación
+
+  const iceServers = {
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  };
+  const currentUserName = "Mi Usuario";
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -99,20 +97,52 @@ const ChatWindow = ({
   // LÓGICA DE WEBRTC (Núcleo)
   // -----------------------------------------------------
 
+  // Función para cerrar la conexión P2P y limpiar
+  const handleEndCall = useCallback(
+    (emitEvent: boolean = true) => {
+      if (emitEvent && socketRef.current) {
+        socketRef.current.emit("call-ended", { toId: user.id });
+      }
+
+      // Cerrar la conexión P2P y detener los streams de media
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+        localStreamRef.current = null;
+      }
+      remoteStreamRef.current = null;
+
+      setIsCallActive(false);
+      setIsCalling(false);
+      toast({
+        title: "Llamada Finalizada",
+        description: "La conexión ha sido cerrada.",
+      });
+
+      if (myAudio.current) myAudio.current.srcObject = null;
+      if (userAudio.current) userAudio.current.srcObject = null;
+    },
+    [user.id]
+  );
+
   // Obtener el stream de audio/video local
-  const getLocalStream = async (callType: "video" | "audio") => {
+  const getLocalStream = useCallback(async (callType: "video" | "audio") => {
     try {
       const constraints = {
         video: callType === "video" ? { width: 640, height: 480 } : false,
         audio: true,
       };
-      localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      localStreamRef.current = stream;
 
       if (myAudio.current) {
-        myAudio.current.srcObject = localStream;
+        myAudio.current.srcObject = stream;
         myAudio.current.muted = true;
       }
-      return localStream;
+      return stream;
     } catch (err) {
       console.error("Error al obtener el stream local:", err);
       toast({
@@ -122,49 +152,22 @@ const ChatWindow = ({
       });
       return null;
     }
-  };
-
-  // Función para cerrar la conexión P2P y limpiar
-  const handleEndCall = (emitEvent: boolean = true) => {
-    if (emitEvent) {
-      socket.emit("call-ended", { toId: user.id });
-    }
-
-    if (peerConnection) {
-      peerConnection.close();
-      peerConnection = null;
-    }
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop());
-      localStream = null;
-    }
-    remoteStream = null;
-
-    setIsCallActive(false);
-    setIsCalling(false);
-    toast({
-      title: "Llamada Finalizada",
-      description: "La conexión ha sido cerrada.",
-    });
-
-    if (myAudio.current) myAudio.current.srcObject = null;
-    if (userAudio.current) userAudio.current.srcObject = null;
-  };
+  }, []);
 
   // Configuración de la conexión P2P
   const setupPeerConnection = useCallback(
     (userToId: number) => {
-      if (peerConnection) {
-        peerConnection.close();
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
       }
 
       const pc = new RTCPeerConnection(iceServers);
-      peerConnection = pc;
+      peerConnectionRef.current = pc;
 
       // 1. Manejo de ICE candidates
       pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("ice-candidate", {
+        if (event.candidate && socketRef.current) {
+          socketRef.current.emit("ice-candidate", {
             toId: userToId,
             candidate: event.candidate,
           });
@@ -174,9 +177,9 @@ const ChatWindow = ({
       // 2. Manejo del stream remoto
       pc.ontrack = (event) => {
         if (event.streams && event.streams[0]) {
-          remoteStream = event.streams[0];
+          remoteStreamRef.current = event.streams[0];
           if (userAudio.current) {
-            userAudio.current.srcObject = remoteStream;
+            userAudio.current.srcObject = remoteStreamRef.current;
             userAudio.current
               .play()
               .catch((e) =>
@@ -187,72 +190,96 @@ const ChatWindow = ({
       };
 
       // 3. Añadir stream local a la conexión
-      if (localStream) {
-        localStream.getTracks().forEach((track) => {
-          pc.addTrack(track, localStream as MediaStream);
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => {
+          pc.addTrack(track, localStreamRef.current as MediaStream);
         });
       }
 
       return pc;
     },
-    [user.id, currentUserId]
+    [user.id]
   );
 
   // Función para iniciar el proceso de llamada
-  const handleInitiateCall = async (callType: "video" | "audio") => {
-    if (isCalling || isCallActive) return;
+  const handleInitiateCall = useCallback(
+    async (callType: "video" | "audio") => {
+      if (isCalling || isCallActive || !socketRef.current) return;
 
-    setIsCalling(true);
+      setIsCalling(true);
 
-    const stream = await getLocalStream(callType);
-    if (!stream) {
-      setIsCalling(false);
-      return;
-    }
+      const stream = await getLocalStream(callType);
+      if (!stream) {
+        setIsCalling(false);
+        return;
+      }
 
-    const pc = setupPeerConnection(user.id);
+      const pc = setupPeerConnection(user.id);
 
-    try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
 
-      socket.emit("call-user", {
-        userToCallId: user.id,
-        signal: pc.localDescription, // Enviar la Oferta SDP
-        from: currentUserId,
-        name: currentUserName,
-        callType: callType, // Para que el receptor sepa si es video o solo audio
-      });
+        socketRef.current.emit("call-user", {
+          userToCallId: user.id,
+          signal: pc.localDescription,
+          from: currentUserId,
+          name: currentUserName,
+          callType: callType,
+        });
 
-      toast({
-        title: `Llamando a ${user.nombre}...`,
-        description: `Esperando respuesta...`,
-      });
-    } catch (error) {
-      console.e(error);
-      toast({
-        title: "Error de Llamada",
-        description: "Fallo al iniciar la llamada.",
-      });
-      handleEndCall(false);
-    }
-  };
+        toast({
+          title: `Llamando a ${user.nombre}...`,
+          description: `Esperando respuesta...`,
+        });
+      } catch (error) {
+        console.error(error);
+        toast({
+          title: "Error de Llamada",
+          description: "Fallo al iniciar la llamada.",
+        });
+        handleEndCall(false);
+      }
+    },
+    [
+      isCalling,
+      isCallActive,
+      user.id,
+      currentUserId,
+      currentUserName,
+      getLocalStream,
+      setupPeerConnection,
+      handleEndCall,
+    ]
+  );
 
   // -----------------------------------------------------
   // EFECTOS Y SOCKET.IO (Señalización)
   // -----------------------------------------------------
   useEffect(() => {
-    // FIX: Path explícito para entornos como Render
-    socket = io(API_BASE_URL, {
+    // 1. Inicializar Socket.io y registrar al usuario
+    socketRef.current = io(API_BASE_URL, {
       path: "/api/socket.io/",
     });
 
-    socket.on("connect", () => {
-      socket.emit("user-connected", currentUserId);
+    const currentSocket = socketRef.current;
+
+    currentSocket.on("connect", () => {
+      currentSocket.emit("user-connected", currentUserId);
     });
 
-    // 1. Recibir Llamada (Responder)
-    socket.on("receive-call", async ({ signal, from, name, callType }) => {
+    // 2. Recibir Llamada (Responder)
+    const onReceiveCall = async ({
+      signal,
+      from,
+      name,
+      callType,
+    }: {
+      signal: RTCSessionDescriptionInit;
+      from: number;
+      name: string;
+      callType: "video" | "audio";
+    }) => {
       const accept = window.confirm(
         `Llamada entrante de ${name} (${callType}). ¿Aceptar?`
       );
@@ -260,7 +287,9 @@ const ChatWindow = ({
       if (accept) {
         setIsCallActive(true);
 
-        await getLocalStream(callType);
+        const stream = await getLocalStream(callType);
+        if (!stream) return handleEndCall(false);
+
         const pc = setupPeerConnection(from);
 
         // Establecer Oferta remota, crear Respuesta, y enviarla
@@ -268,7 +297,7 @@ const ChatWindow = ({
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
-        socket.emit("accept-call", {
+        currentSocket.emit("accept-call", {
           signal: pc.localDescription,
           toId: from,
         });
@@ -277,78 +306,196 @@ const ChatWindow = ({
           description: `Iniciando con ${name}`,
         });
       } else {
-        // Se puede emitir un evento 'call-rejected' si es necesario
+        // Lógica de rechazo
       }
-    });
+    };
 
-    // 2. Aceptación de Llamada (Iniciador)
-    socket.on("call-accepted", async (signal) => {
+    // 3. Aceptación de Llamada (Iniciador)
+    const onCallAccepted = async (signal: RTCSessionDescriptionInit) => {
       setIsCallActive(true);
       setIsCalling(false);
-      await peerConnection?.setRemoteDescription(
+      await peerConnectionRef.current?.setRemoteDescription(
         new RTCSessionDescription(signal)
       );
       toast({
         title: "Conectado",
         description: `Llamada con ${user.nombre} iniciada.`,
       });
-    });
+    };
 
-    // 3. ICE Candidates
-    socket.on("ice-candidate", (candidate) => {
+    // 4. ICE Candidates
+    const onICECandidate = (candidate: RTCIceCandidate) => {
       try {
-        peerConnection?.addIceCandidate(candidate);
+        peerConnectionRef.current?.addIceCandidate(candidate);
       } catch (e) {
         console.error("Error añadiendo ICE candidate:", e);
       }
-    });
+    };
 
-    // 4. Finalizar Llamada
-    socket.on("call-ended", () => {
+    // 5. Finalizar Llamada
+    const onCallEnded = () => {
       handleEndCall(false);
-    });
+    };
+
+    currentSocket.on("receive-call", onReceiveCall);
+    currentSocket.on("call-accepted", onCallAccepted);
+    currentSocket.on("ice-candidate", onICECandidate);
+    currentSocket.on("call-ended", onCallEnded);
 
     return () => {
-      socket.disconnect();
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop());
-      }
+      // Limpieza de sockets y streams al desmontar
+      currentSocket.off("receive-call", onReceiveCall);
+      currentSocket.off("call-accepted", onCallAccepted);
+      currentSocket.off("ice-candidate", onICECandidate);
+      currentSocket.off("call-ended", onCallEnded);
+      currentSocket.disconnect();
+      // handleEndCall(false); // La limpieza ya se hace en el handler del socket.
     };
-  }, [currentUserId, setupPeerConnection]); // Dependencias: currentUserId, setupPeerConnection
+  }, [
+    currentUserId,
+    getLocalStream,
+    setupPeerConnection,
+    handleEndCall,
+    user.nombre,
+  ]);
 
-  // Ejecutar al cargar y cada vez que cambie el matchId (para mensajes)
+  // Lógica para obtener mensajes de la API
+  const fetchMessages = useCallback(async () => {
+    if (!matchId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/messages/${matchId}`);
+      if (!res.ok) throw new Error("Error al cargar mensajes");
+
+      const data: DbMessage[] = await res.json();
+
+      const convertedMessages: Message[] = data.map((msg: DbMessage) => ({
+        ...msg,
+        // Adaptar campos de la DB al formato del componente
+        text: msg.message,
+        isMe: msg.sender_id === currentUserId,
+        timestamp: new Date(msg.created_at).toLocaleTimeString("es-ES", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        isSending: false,
+      }));
+
+      setMessages(convertedMessages);
+    } catch (error) {
+      console.error("Error al cargar mensajes:", error);
+    }
+  }, [matchId, currentUserId]);
+
+  // Ejecutar al cargar y cada vez que cambie el matchId
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Ejecutar al recibir nuevos mensajes (para scroll)
+  // Ejecutar al recibir nuevos mensajes
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // ... (Lógica de mensajes y match eliminados, omitida por brevedad)
-  // ...
-
   // Lógica para enviar mensajes a la API
-  const fetchMessages = useCallback(async () => {
-    /* ... */
-  }, [matchId, currentUserId]);
   const handleSendMessage = async () => {
-    /* ... */
-  };
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    /* ... */
-  };
-  const handleDeleteMatch = async () => {
-    /* ... */
+    if (message.trim()) {
+      const messageToSend = message.trim();
+
+      // 1. Mensaje temporal (Optimistic update)
+      const tempId = Date.now();
+      const tempMessage: Message = {
+        id: tempId,
+        match_id: matchId,
+        sender_id: currentUserId,
+        message: messageToSend,
+        created_at: new Date().toISOString(),
+        text: messageToSend,
+        timestamp: new Date().toLocaleTimeString("es-ES", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        isMe: true,
+        isSending: true,
+      };
+
+      setMessages((prev) => [...prev, tempMessage]);
+      setMessage(""); // Limpiar el input
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            match_id: matchId,
+            sender_id: currentUserId,
+            message: messageToSend,
+          }),
+        });
+
+        if (!res.ok) throw new Error("Error al enviar el mensaje al backend");
+
+        // 2. Éxito: Recargar mensajes para obtener el ID real de la DB
+        await fetchMessages();
+      } catch (error) {
+        console.error("Error al enviar mensaje:", error);
+        // 3. Fallo: Revertir el mensaje temporal
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      }
+    }
   };
 
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleDeleteMatch = async () => {
+    if (!matchId) return;
+
+    if (
+      window.confirm(
+        `¿Estás seguro de que quieres eliminar el match con ${user.nombre}? Se perderá toda la conversación.`
+      )
+    ) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/matches/${matchId}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!res.ok)
+          throw new Error("Error al eliminar el match en el backend");
+
+        // Mostrar notificación de éxito
+        toast({
+          title: "Match eliminado",
+          description: `El chat con ${user.nombre} ha sido eliminado.`,
+          variant: "default",
+        });
+
+        // 2. Volver a la lista de matches
+        onBack();
+      } catch (error) {
+        console.error("Error al eliminar match:", error);
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el match. Intenta de nuevo.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Obtener idiomas nativos para el header/tip
   const nativeLanguages =
     user.usuario_idioma
       ?.filter((i) => i.tipo === "nativo")
       .map((i) => i.nombre) || [];
   const partnerNativeLang =
     nativeLanguages.length > 0 ? nativeLanguages[0] : "Nativo";
+
   const myNativeLang = "Español";
 
   return (

@@ -263,9 +263,17 @@ app.get("/api/usuario_idioma", async (req, res) => {
 app.use("/api/usuarios", usuariosRouter);
 
 // --- AÑADIR: Configuración y Eventos de Socket.io para la Señalización WebRTC ---
+
+// 🔹 Escuchar puerto después de todas las rutas
+const PORT = process.env.PORT || 5000;
+const httpServer = app.listen(PORT, () =>
+  console.log(`Servidor corriendo en puerto ${PORT}`)
+);
+
 const io = new Server(httpServer, {
+  path: "/api/socket.io/", // <--- CORRECCIÓN CLAVE: Path explícito
   cors: {
-    origin: "*", // Permite conexiones desde el frontend de Vite (http://localhost:8080)
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
@@ -331,9 +339,4 @@ io.on("connection", (socket) => {
   });
 });
 
-// 🔹 Escuchar puerto después de todas las rutas
-const PORT = process.env.PORT || 5000;
-const httpServer = app.listen(PORT, () =>
-  console.log(`Servidor corriendo en puerto ${PORT}`)
-);
 //app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));

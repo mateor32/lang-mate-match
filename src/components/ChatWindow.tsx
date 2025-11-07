@@ -113,10 +113,12 @@ const ChatWindow = ({
     }
   }, [matchId, currentUserId]);
 
-  // --- NUEVO: Conexión y Lógica de Señalización ---
   useEffect(() => {
-    // 1. Conectar Socket.io y registrar al usuario
-    socket = io(API_BASE_URL);
+    // Asegurar que el socket esté conectado al cargar el componente
+    socket = io(API_BASE_URL, {
+      // <--- MODIFICADO: Añadir objeto de opciones
+      path: "/api/socket.io/", // <--- CORRECCIÓN CLAVE: Usar el mismo path explícito
+    });
 
     socket.on("connect", () => {
       // Enviar el ID del usuario logueado al backend para mapear socketId -> userId

@@ -23,6 +23,6 @@ router.put("/:id", updateUsuario);
 router.put("/:id/idiomas", updateIdiomas);
 router.put("/:id/intereses", updateIntereses);
 
-// Ruta de intereses
+// Ruta de interesesssssssss
 
 export default router;

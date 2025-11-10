@@ -103,14 +103,6 @@ export const updateIdiomas = async (req, res) => {
   const idInt = parseInt(id, 10);
   const idiomasArray = Array.isArray(idiomas) ? idiomas : [];
 
-  // Convertir a número y filtrar valores no válidos (0 o no enteros)
-  const nativosInt = nativosArray
-    .map(Number)
-    .filter((n) => Number.isInteger(n) && n > 0);
-  const aprendiendoInt = aprendiendoArray
-    .map(Number)
-    .filter((n) => Number.isInteger(n) && n > 0);
-
   try {
     await pool.query("BEGIN");
 
@@ -138,11 +130,9 @@ export const updateIdiomas = async (req, res) => {
   } catch (err) {
     await pool.query("ROLLBACK");
     console.error("Error al actualizar idiomas y niveles:", err);
-    res
-      .status(500)
-      .json({
-        error: "Error interno del servidor al actualizar idiomas y niveles",
-      });
+    res.status(500).json({
+      error: "Error interno del servidor al actualizar idiomas y niveles",
+    });
   }
 };
 

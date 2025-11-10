@@ -7,6 +7,7 @@ import matchRouter from "./routes/match.js";
 import messageRouter from "./routes/message.js"; // <-- NUEVO: Importa el router de mensajes
 import { googleAuth } from "./controllers/authController.js";
 import premiumRouter from "./routes/premium.js";
+import likesRouter from "./routes/likes.js";
 import { Server } from "socket.io"; // // <-- CORRECCIÓN: ajustada la capitalización para coincidir con el nombre real del fichero
 
 import dotenv from "dotenv";

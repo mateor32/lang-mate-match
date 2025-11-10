@@ -81,7 +81,7 @@ const freePlan: Plan = {
   isPopular: false,
   buttonText: "Elegir Gratis",
   variant: "secondary",
-  features: basicFeatures.map((f, i) => ({ ...f, isIncluded: i === 0 })), // Solo deslizamiento ilimitado para el Free (ajustado para la UI)
+  features: basicFeatures.map((f) => ({ ...f, isIncluded: false })), // ⬅️ CAMBIO: Todas las características son 'false'
 };
 
 const plans: Plan[] = [freePlan, premiumPlan, superPremiumPlan];

@@ -35,6 +35,7 @@ interface Plan {
 }
 
 const basicFeatures: PlanFeature[] = [
+  { text: "Deslizamiento X2", isIncluded: false },
   { text: "Deslizamiento ilimitado", isIncluded: false },
   { text: "5 'Super Likes' diarios", isIncluded: false },
   { text: "Ver quién te dio 'like'", isIncluded: false },
@@ -51,7 +52,8 @@ const premiumPlan: Plan = {
   buttonText: "Elegir Premium",
   variant: "default",
   features: [
-    { text: "Deslizamiento ilimitado", isIncluded: true },
+    { text: "Deslizamiento X2", isIncluded: true },
+    { text: "Deslizamiento ilimitado", isIncluded: false },
     { text: "5 'Super Likes' diarios", isIncluded: true },
     { text: "Ver quién te dio 'like'", isIncluded: false },
     { text: "Traducción automática en el chat", isIncluded: false },
@@ -68,6 +70,7 @@ const superPremiumPlan: Plan = {
   buttonText: "Elegir Super Premium",
   variant: "default",
   features: [
+    { text: "Deslizamiento X2", isIncluded: true },
     { text: "Deslizamiento ilimitado", isIncluded: true },
     { text: "5 'Super Likes' diarios", isIncluded: true },
     { text: "Ver quién te dio 'like'", isIncluded: true },

@@ -18,6 +18,16 @@ import UserCard from "./UserCard";
 import MatchModal from "./MatchModal";
 import ChatList from "./ChatList";
 import ChatWindow from "./ChatWindow";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"; // ⬅️ IMPORTAR AlertDialog
 
 import { useUsuarios, Usuario } from "@/hooks/useUsuarios";
 import { usuarioToUser, User } from "@/utils/usuarioToUser";
@@ -57,6 +67,12 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
   const [userPlan, setUserPlan] = useState<
     "Gratis" | "Premium" | "Super Premium"
   >("Gratis");
+
+  // ⬅️ NUEVO ESTADO: Para el modal de error de límite de likes
+  const [likeError, setLikeError] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     // 2. Usamos el userId de la prop para el fetch (se evita el "undefined")
@@ -159,7 +175,12 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
         // 2. CLAVE: Manejar la respuesta de límite de likes
         if (likeResponse.status === 403) {
           const errorData = await likeResponse.json();
-          alert(errorData.message); // Usar toast o notificación real aquí
+          // ⬅️ CAMBIO CLAVE: Usar setLikeError en lugar de alert()
+          setLikeError({
+            title: "Límite Diario Alcanzado",
+            message: errorData.message, // El mensaje viene del backend
+          });
+
           setIsAnimating(false);
           return; // Detener el proceso si el límite se ha alcanzado
         }
@@ -471,10 +492,36 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
         </div>
       </div>
 
-      {/* Matchcdd modal */}
-      {matchedUser && (
-        <MatchModal user={matchedUser} onClose={closeMatchModal} />
-      )}
+      {/* ⬅️ NUEVO MODAL: Error de Límite de Likes (DISEÑO MEJORADO) */}
+      <AlertDialog open={!!likeError} onOpenChange={() => setLikeError(null)}>
+        <AlertDialogContent className="w-full max-w-sm p-6 text-center">
+          <AlertDialogHeader>
+            <Crown className="mx-auto w-10 h-10 text-match fill-yellow-500/30 mb-2" />
+            <AlertDialogTitle className="text-xl font-bold text-destructive">
+              {likeError?.title || "Límite Alcanzado"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-muted-foreground">
+              {likeError?.message ||
+                "Tu límite de likes diario ha sido alcanzado."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-col space-y-3 pt-4">
+            <AlertDialogAction
+              onClick={handlePremium} // Navega a la página Premium
+              className="w-full bg-primary hover:bg-primary/90 font-semibold"
+            >
+              <Crown className="w-4 h-4 mr-2" />
+              Obtener Premium (¡Likes Ilimitados!)
+            </AlertDialogAction>
+            <AlertDialogCancel
+              onClick={() => setLikeError(null)}
+              className="w-full mt-0 bg-secondary hover:bg-secondary/80"
+            >
+              Continuar más tarde
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

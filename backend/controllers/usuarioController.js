@@ -98,13 +98,10 @@ export const updateUsuario = async (req, res) => {
 // PUT /api/usuarios/:id/idiomas
 export const updateIdiomas = async (req, res) => {
   const { id } = req.params;
-  const { nativos, aprendiendo } = req.body;
+  const { idiomas } = req.body;
 
   const idInt = parseInt(id, 10);
-
-  // **CORRECCIÓN CLAVE:** Asegurar que son arrays y convertir a números válidos
-  const nativosArray = Array.isArray(nativos) ? nativos : [];
-  const aprendiendoArray = Array.isArray(aprendiendo) ? aprendiendo : [];
+  const idiomasArray = Array.isArray(idiomas) ? idiomas : [];
 
   // Convertir a número y filtrar valores no válidos (0 o no enteros)
   const nativosInt = nativosArray
@@ -122,30 +119,30 @@ export const updateIdiomas = async (req, res) => {
       idInt,
     ]);
 
-    // 2. Insertar idiomas nativos
-    for (const langId of nativosInt) {
-      await pool.query(
-        "INSERT INTO usuario_idioma (usuario_id, idioma_id, tipo) VALUES ($1, $2, 'nativo')",
-        [idInt, langId]
-      );
-    }
+    // 2. Insertar nuevos idiomas con su nivel
+    for (const { langId, tipo, nivelId } of idiomasArray) {
+      const langIdInt = parseInt(langId, 10);
+      // Convertir a INT y usar NULL si no es un número válido o no se proporciona
+      const nivelIdInt = nivelId ? parseInt(nivelId, 10) : null;
 
-    // 3. Insertar idiomas que está aprendiendo
-    for (const langId of aprendiendoInt) {
-      await pool.query(
-        "INSERT INTO usuario_idioma (usuario_id, idioma_id, tipo) VALUES ($1, $2, 'aprender')",
-        [idInt, langId]
-      );
+      if (Number.isInteger(langIdInt) && langIdInt > 0) {
+        await pool.query(
+          "INSERT INTO usuario_idioma (usuario_id, idioma_id, tipo, nivel_id) VALUES ($1, $2, $3, $4)",
+          [idInt, langIdInt, tipo, nivelIdInt]
+        );
+      }
     }
 
     await pool.query("COMMIT");
-    res.json({ message: "Idiomas actualizados con éxito" });
+    res.json({ message: "Idiomas y niveles actualizados con éxito" });
   } catch (err) {
     await pool.query("ROLLBACK");
-    console.error("Error al actualizar idiomas:", err);
+    console.error("Error al actualizar idiomas y niveles:", err);
     res
       .status(500)
-      .json({ error: "Error interno del servidor al actualizar idiomas" });
+      .json({
+        error: "Error interno del servidor al actualizar idiomas y niveles",
+      });
   }
 };
 
@@ -223,6 +220,18 @@ export const checkPremiumStatus = async (req, res) => {
     res.json({ isPremium: false, plan: "Gratis" });
   } catch (err) {
     console.error("Error al verificar estado Premium:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+export const getNiveles = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, nombre FROM niveles ORDER BY id"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error al obtener niveles disponibles:", err);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };

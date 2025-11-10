@@ -116,10 +116,11 @@ app.get("/api/usuarios", async (req, res) => {
     const usuariosConIdiomas = await Promise.all(
       usuariosResult.rows.map(async (usuario) => {
         const idiomasResult = await pool.query(
-          `SELECT i.nombre, ui.tipo
-       FROM usuario_idioma ui
-       JOIN idiomas i ON ui.idioma_id = i.id
-       WHERE ui.usuario_id = $1`,
+          `SELECT i.nombre, ui.tipo, ui.nivel_id, n.nombre as nivel_nombre
+           FROM usuario_idioma ui
+           JOIN idiomas i ON ui.idioma_id = i.id
+           LEFT JOIN niveles n ON ui.nivel_id = n.id -- LEFT JOIN por si nivel_id es null
+           WHERE ui.usuario_id = $1`,
           [usuario.id]
         );
 
@@ -148,7 +149,6 @@ app.get("/api/usuarios", async (req, res) => {
 
 // Ruta: obtener un usuario por su ID
 app.get("/api/usuarios/:id", async (req, res) => {
-  // ... (código existente del endpoint /api/usuarios/:id)
   try {
     const { id } = req.params;
 
@@ -162,9 +162,10 @@ app.get("/api/usuarios/:id", async (req, res) => {
     const usuario = userResult.rows[0];
 
     const idiomasResult = await pool.query(
-      `SELECT i.id, i.nombre, ui.tipo 
+      `SELECT i.id, i.nombre, ui.tipo, ui.nivel_id, n.nombre as nivel_nombre 
        FROM usuario_idioma ui
        JOIN idiomas i ON ui.idioma_id = i.id
+       LEFT JOIN niveles n ON ui.nivel_id = n.id -- LEFT JOIN por si nivel_id es null
        WHERE ui.usuario_id = $1`,
       [id]
     );

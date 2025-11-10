@@ -8,10 +8,13 @@ interface User {
   nombre: string;
   edad: number;
   pais: string;
+  // <--- INTERFAZ ACTUALIZADA PARA INCLUIR NIVELES DE IDIOMA --->
   usuario_idioma?: {
     tipo: string;
     id: number;
     nombre: string;
+    nivel_id?: number;
+    nivel_nombre?: string;
   }[];
   intereses?: { id: number; nombre: string }[];
   foto: string;
@@ -70,7 +73,18 @@ const UserCard = ({ user, onLike, onDislike, isAnimating }: UserCardProps) => {
               {user.usuario_idioma
                 ?.filter((i) => i.tipo === "nativo")
                 .map((i, idx) => (
-                  <Badge key={idx}>{i.nombre}</Badge>
+                  <Badge
+                    key={idx}
+                    className="flex flex-col items-start gap-0.5"
+                  >
+                    <span className="font-semibold">{i.nombre}</span>
+                    {/* Renderiza el nivel si existe */}
+                    {i.nivel_nombre && (
+                      <span className="text-[0.65rem] font-normal opacity-75">
+                        {i.nivel_nombre}
+                      </span>
+                    )}
+                  </Badge>
                 ))}
             </div>
           </div>
@@ -85,7 +99,18 @@ const UserCard = ({ user, onLike, onDislike, isAnimating }: UserCardProps) => {
                 {user.usuario_idioma
                   ?.filter((i) => i.tipo === "aprender")
                   .map((i, idx) => (
-                    <Badge key={idx}>{i.nombre}</Badge>
+                    <Badge
+                      key={idx}
+                      className="flex flex-col items-start gap-0.5"
+                    >
+                      <span className="font-semibold">{i.nombre}</span>
+                      {/* Renderiza el nivel si existe */}
+                      {i.nivel_nombre && (
+                        <span className="text-[0.65rem] font-normal opacity-75">
+                          {i.nivel_nombre}
+                        </span>
+                      )}
+                    </Badge>
                   ))}
               </div>
             </div>

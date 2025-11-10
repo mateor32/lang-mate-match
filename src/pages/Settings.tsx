@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils"; // <-- CORRECCIÓN: Importación faltante
 
 // **CLAVE: Definir URL Base para la API**
 const API_BASE_URL =
@@ -32,6 +33,8 @@ interface User {
     tipo: string;
     id: number;
     nombre: string;
+    nivel_id?: number; // <-- Nuevo campo
+    nivel_nombre?: string; // <-- Nuevo campo
   }[];
   intereses?: Resource[];
   foto: string;
@@ -61,8 +64,12 @@ export default function ProfileSettings() {
   // Estados para recursos disponibles y selecciones
   const [availableLanguages, setAvailableLanguages] = useState<Resource[]>([]);
   const [availableInterests, setAvailableInterests] = useState<Resource[]>([]);
+  const [availableNiveles, setAvailableNiveles] = useState<Resource[]>([]); // <-- CORRECCIÓN: Nuevo estado para niveles
   const [selectedNativos, setSelectedNativos] = useState<number[]>([]);
   const [selectedAprendiendo, setSelectedAprendiendo] = useState<number[]>([]);
+  const [aprendiendoLevels, setAprendiendoLevels] = useState<
+    Record<number, number | null>
+  >({}); // <-- CORRECCIÓN: Nuevo estado para mapear IDs de idioma a IDs de nivel
   const [selectedIntereses, setSelectedIntereses] = useState<number[]>([]);
 
   const form = useForm<ProfileFormValues>();
@@ -85,6 +92,40 @@ export default function ProfileSettings() {
     }
   };
 
+  // <-- CORRECCIÓN: Nuevas funciones para manejar la selección y el nivel
+  const handleAprendiendoSelection = (id: number) => {
+    // Standard checkbox toggle for language selection
+    setSelectedAprendiendo((currentSelection) => {
+      const isSelected = currentSelection.includes(id);
+      const newSelection = isSelected
+        ? currentSelection.filter((itemId) => itemId !== id) // Remove
+        : [...currentSelection, id]; // Add
+
+      // Update levels state
+      setAprendiendoLevels((prevLevels) => {
+        const newLevels = { ...prevLevels };
+        if (!isSelected) {
+          // If language is added, select a default level (the first one)
+          newLevels[id] =
+            availableNiveles.length > 0 ? availableNiveles[0].id : null;
+        } else {
+          // If language is removed, delete its level entry
+          delete newLevels[id];
+        }
+        return newLevels;
+      });
+
+      return newSelection;
+    });
+  };
+
+  const handleLevelChange = (langId: number, nivelId: number | null) => {
+    setAprendiendoLevels((prevLevels) => ({
+      ...prevLevels,
+      [langId]: nivelId,
+    }));
+  };
+
   // ------------------------------------------
   // Lógica de Carga del Perfil y Recursos
   // ------------------------------------------
@@ -94,15 +135,19 @@ export default function ProfileSettings() {
       return;
     }
     try {
-      // 1. Fetch recursos disponibles
-      const [langRes, intRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/usuarios/idiomas`), // <-- URL CORREGIDA
-        fetch(`${API_BASE_URL}/api/usuarios/intereses`), // <-- URL CORREGIDA
+      // 1. Fetch recursos disponibles (incluyendo niveles)
+      const [langRes, intRes, nivelRes] = await Promise.all([
+        // <-- AÑADIR nivelRes
+        fetch(`${API_BASE_URL}/api/usuarios/idiomas`),
+        fetch(`${API_BASE_URL}/api/usuarios/intereses`),
+        fetch(`${API_BASE_URL}/api/usuarios/niveles`), // <-- NUEVO ENDPOINT
       ]);
       const availableLanguagesData = langRes.ok ? await langRes.json() : [];
       const availableInterestsData = intRes.ok ? await intRes.json() : [];
+      const availableNivelesData = nivelRes.ok ? await nivelRes.json() : []; // <-- NUEVO
       setAvailableLanguages(availableLanguagesData);
       setAvailableInterests(availableInterestsData);
+      setAvailableNiveles(availableNivelesData); // <-- NUEVO
 
       // 2. Fetch datos del usuario logueado
       const userRes = await fetch(`${API_BASE_URL}/api/usuarios/${userId}`); // <-- URL CORREGIDA
@@ -119,6 +164,21 @@ export default function ProfileSettings() {
         .filter((i: any) => i.tipo === "aprender")
         .map((i: any) => i.id);
 
+      // **NUEVA LÓGICA PARA NIVELES**
+      const initialAprendiendoLevels: Record<number, number | null> = {};
+      idiomasArray
+        .filter((i: any) => i.tipo === "aprender")
+        .forEach((i: any) => {
+          // Asumimos que nivel_id viene de la DB (puede ser null)
+          initialAprendiendoLevels[i.id] = i.nivel_id
+            ? parseInt(i.nivel_id, 10)
+            : null;
+        });
+
+      setSelectedNativos(nativosIds);
+      setSelectedAprendiendo(aprendiendoIds);
+      setAprendiendoLevels(initialAprendiendoLevels); // <-- NEW
+
       const interesesRes = await fetch(
         `${API_BASE_URL}/api/usuarios/${userId}/intereses` // <-- URL CORREGIDA
       );
@@ -126,13 +186,19 @@ export default function ProfileSettings() {
       // Corregido: Usar i.id para mapear IDs
       const interesesIds = interesesData.map((i: any) => i.id);
 
-      setSelectedNativos(nativosIds);
-      setSelectedAprendiendo(aprendiendoIds);
       setSelectedIntereses(interesesIds);
 
       const user: User = {
         id: data.id,
         nombre: data.nombre,
+        // CLAVE: Asegurarse de que la propiedad del idioma es 'usuario_idioma' para la interfaz User
+        usuario_idioma: idiomasArray.map((i: any) => ({
+          tipo: i.tipo,
+          id: i.id,
+          nombre: i.nombre,
+          nivel_id: i.nivel_id,
+          nivel_nombre: i.nivel_nombre,
+        })),
         foto: data.foto || "/placeholder.svg",
         edad: data.fecha_nacimiento
           ? new Date().getFullYear() -
@@ -157,7 +223,7 @@ export default function ProfileSettings() {
     } finally {
       setLoading(false);
     }
-  }, [userId, reset]); // userId es clave de dependencia
+  }, [userId, reset, availableNiveles]); // Dependencia disponibleNiveles para la inicialización de niveles
 
   useEffect(() => {
     fetchProfileData();
@@ -166,8 +232,6 @@ export default function ProfileSettings() {
   // ------------------------------------------
   // Lógica de Envío (Guardar)
   // ------------------------------------------
-  // ... en src/pages/Settings.tsx (dentro de onSubmit, alrededor de la línea 205)
-
   const onSubmit = async (data: ProfileFormValues) => {
     if (!userId) return;
     try {
@@ -189,15 +253,36 @@ export default function ProfileSettings() {
         }
       );
 
-      // 2. Actualizar Idiomas
+      // 2. Actualizar Idiomas (CON NIVELES)
+      // Construir la estructura de datos que espera el backend (updateIdiomas)
+      const idiomasToUpdate = [];
+
+      // Añadir idiomas nativos
+      selectedNativos.forEach((langId) => {
+        idiomasToUpdate.push({
+          langId,
+          tipo: "nativo",
+          nivelId: null,
+        });
+      });
+
+      // Añadir idiomas a aprender (con nivel)
+      selectedAprendiendo.forEach((langId) => {
+        idiomasToUpdate.push({
+          langId,
+          tipo: "aprender",
+          // Mapea el nivel seleccionado o null si no se eligió
+          nivelId: aprendiendoLevels[langId],
+        });
+      });
+
       const langUpdatePromise = fetch(
         `${API_BASE_URL}/api/usuarios/${userId}/idiomas`, // <-- URL CORREGIDA
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            nativos: selectedNativos,
-            aprendiendo: selectedAprendiendo,
+            idiomas: idiomasToUpdate, // <-- NUEVA ESTRUCTURA
           }),
         }
       );
@@ -367,27 +452,56 @@ export default function ProfileSettings() {
                   Quiero Aprender
                 </Label>
                 <div className="max-h-40 overflow-y-auto space-y-2 rounded-md border p-3">
-                  {availableLanguages.map((lang) => (
-                    <div key={lang.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`aprender-${lang.id}`}
-                        checked={selectedAprendiendo.includes(lang.id)}
-                        onCheckedChange={() =>
-                          handleSelection(
-                            lang.id,
-                            selectedAprendiendo,
-                            setSelectedAprendiendo
-                          )
-                        }
-                      />
-                      <Label
-                        htmlFor={`aprender-${lang.id}`}
-                        className="font-normal cursor-pointer"
+                  {availableLanguages.map((lang) => {
+                    const isSelected = selectedAprendiendo.includes(lang.id);
+                    // Usar el nivel actualmente seleccionado, o nulo
+                    const currentLevel = aprendiendoLevels[lang.id] || "";
+
+                    return (
+                      <div
+                        key={lang.id}
+                        className={cn(
+                          "flex items-center space-x-2",
+                          isSelected ? "bg-accent/10 rounded-md p-1 -m-1" : ""
+                        )}
                       >
-                        {lang.nombre}
-                      </Label>
-                    </div>
-                  ))}
+                        <Checkbox
+                          id={`aprender-${lang.id}`}
+                          checked={isSelected}
+                          onCheckedChange={() =>
+                            handleAprendiendoSelection(lang.id)
+                          }
+                        />
+                        <Label
+                          htmlFor={`aprender-${lang.id}`}
+                          className="font-normal flex-1 cursor-pointer"
+                        >
+                          {lang.nombre}
+                        </Label>
+                        {/* NUEVO: Selector de nivel si la casilla está marcada */}
+                        {isSelected && (
+                          <select
+                            value={currentLevel}
+                            onChange={(e) =>
+                              handleLevelChange(
+                                lang.id,
+                                parseInt(e.target.value, 10) || null
+                              )
+                            }
+                            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                            title={`Nivel de ${lang.nombre}`}
+                          >
+                            <option value="">Nivel (Opcional)</option>
+                            {availableNiveles.map((nivel) => (
+                              <option key={nivel.id} value={nivel.id}>
+                                {nivel.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

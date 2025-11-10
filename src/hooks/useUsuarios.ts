@@ -16,6 +16,8 @@ export interface Usuario {
     tipo: string;
     id: number;
     nombre: string;
+    nivel_id?: number;
+    nivel_nombre?: string;
   }[];
   intereses?: { id: number; nombre: string }[];
 }

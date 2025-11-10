@@ -101,13 +101,14 @@ const UserCard = ({ user, onLike, onDislike, isAnimating }: UserCardProps) => {
                   .map((i, idx) => (
                     <Badge
                       key={idx}
-                      className="flex flex-col items-start gap-0.5"
+                      variant="secondary" // Usar secondary/outline para diferenciarlas de las nativas
+                      className="text-xs" // Mantener un tamaño de fuente pequeño
                     >
                       <span className="font-semibold">{i.nombre}</span>
-                      {/* Renderiza el nivel si existe */}
+                      {/* Renderiza el nivel más sutilmente */}
                       {i.nivel_nombre && (
-                        <span className="text-[0.65rem] font-normal opacity-75">
-                          {i.nivel_nombre}
+                        <span className="ml-1 opacity-70">
+                          - {i.nivel_nombre}
                         </span>
                       )}
                     </Badge>

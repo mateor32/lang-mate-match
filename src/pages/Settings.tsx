@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils"; // <-- CORRECCIÓN: Importación faltante
+import { cn } from "@/lib/utils"; // <-- CORRECCIÓN: Importación agregada
 
 // **CLAVE: Definir URL Base para la API**
 const API_BASE_URL =
@@ -64,12 +64,12 @@ export default function ProfileSettings() {
   // Estados para recursos disponibles y selecciones
   const [availableLanguages, setAvailableLanguages] = useState<Resource[]>([]);
   const [availableInterests, setAvailableInterests] = useState<Resource[]>([]);
-  const [availableNiveles, setAvailableNiveles] = useState<Resource[]>([]); // <-- CORRECCIÓN: Nuevo estado para niveles
+  const [availableNiveles, setAvailableNiveles] = useState<Resource[]>([]); // <-- Nuevo estado para niveles
   const [selectedNativos, setSelectedNativos] = useState<number[]>([]);
   const [selectedAprendiendo, setSelectedAprendiendo] = useState<number[]>([]);
   const [aprendiendoLevels, setAprendiendoLevels] = useState<
     Record<number, number | null>
-  >({}); // <-- CORRECCIÓN: Nuevo estado para mapear IDs de idioma a IDs de nivel
+  >({}); // <-- Nuevo estado para mapear IDs de idioma a IDs de nivel
   const [selectedIntereses, setSelectedIntereses] = useState<number[]>([]);
 
   const form = useForm<ProfileFormValues>();
@@ -92,7 +92,7 @@ export default function ProfileSettings() {
     }
   };
 
-  // <-- CORRECCIÓN: Nuevas funciones para manejar la selección y el nivel
+  // <-- Funciones de manejo de niveles -->
   const handleAprendiendoSelection = (id: number) => {
     // Standard checkbox toggle for language selection
     setSelectedAprendiendo((currentSelection) => {
@@ -137,7 +137,6 @@ export default function ProfileSettings() {
     try {
       // 1. Fetch recursos disponibles (incluyendo niveles)
       const [langRes, intRes, nivelRes] = await Promise.all([
-        // <-- AÑADIR nivelRes
         fetch(`${API_BASE_URL}/api/usuarios/idiomas`),
         fetch(`${API_BASE_URL}/api/usuarios/intereses`),
         fetch(`${API_BASE_URL}/api/usuarios/niveles`), // <-- NUEVO ENDPOINT
@@ -147,7 +146,7 @@ export default function ProfileSettings() {
       const availableNivelesData = nivelRes.ok ? await nivelRes.json() : []; // <-- NUEVO
       setAvailableLanguages(availableLanguagesData);
       setAvailableInterests(availableInterestsData);
-      setAvailableNiveles(availableNivelesData); // <-- NUEVO
+      setAvailableNiveles(availableNivelesData); // <-- Esta llamada ya no causa el bucle
 
       // 2. Fetch datos del usuario logueado
       const userRes = await fetch(`${API_BASE_URL}/api/usuarios/${userId}`); // <-- URL CORREGIDA
@@ -223,7 +222,7 @@ export default function ProfileSettings() {
     } finally {
       setLoading(false);
     }
-  }, [userId, reset, availableNiveles]); // Dependencia disponibleNiveles para la inicialización de niveles
+  }, [userId, reset]); // <-- CORRECCIÓN CLAVE: Eliminada la dependencia 'availableNiveles'
 
   useEffect(() => {
     fetchProfileData();

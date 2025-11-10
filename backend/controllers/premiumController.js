@@ -53,10 +53,46 @@ export const subscribePremium = async (req, res) => {
   } catch (err) {
     console.error("Error al suscribir a Premium (DB Error):", err);
     // Devolvemos un error 500 y un mensaje genérico.
+    res.status(500).json({
+      error: "Error interno del servidor al procesar la suscripción.",
+    });
+  }
+};
+
+export const cancelSubscription = async (req, res) => {
+  const { userId } = req.body;
+  const userIdInt = parseInt(userId, 10);
+
+  if (!userIdInt || isNaN(userIdInt)) {
+    return res
+      .status(400)
+      .json({ error: "Falta o es inválido el ID de usuario." });
+  }
+
+  try {
+    // 1. Desactivar el registro de suscripción existente
+    await pool.query(
+      `UPDATE public.suscripciones 
+       SET estado = 'inactivo' 
+       WHERE usuario_id = $1 AND estado = 'activo'`,
+      [userIdInt]
+    );
+
+    console.log(`[Premium] Usuario ${userIdInt} ha cancelado su suscripción.`);
+
+    // 2. Devolver la respuesta de éxito
+    res.json({
+      success: true,
+      plan: "Gratis",
+      message:
+        "Tu plan Premium ha sido cancelado. Ahora estás en el plan Gratis.",
+    });
+  } catch (err) {
+    console.error("Error al cancelar suscripción:", err);
     res
       .status(500)
       .json({
-        error: "Error interno del servidor al procesar la suscripción.",
+        error: "Error interno del servidor al cancelar la suscripción.",
       });
   }
 };

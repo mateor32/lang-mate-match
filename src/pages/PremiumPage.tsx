@@ -37,9 +37,7 @@ interface Plan {
 const basicFeatures: PlanFeature[] = [
   { text: "Deslizamiento X2", isIncluded: false },
   { text: "Deslizamiento ilimitado", isIncluded: false },
-  { text: "5 'Super Likes' diarios", isIncluded: false },
   { text: "Ver quién te dio 'like'", isIncluded: false },
-  { text: "Traducción automática en el chat", isIncluded: false },
   { text: "Filtros de búsqueda avanzados", isIncluded: false },
 ];
 
@@ -54,9 +52,7 @@ const premiumPlan: Plan = {
   features: [
     { text: "Deslizamiento X2", isIncluded: true },
     { text: "Deslizamiento ilimitado", isIncluded: false },
-    { text: "5 'Super Likes' diarios", isIncluded: true },
     { text: "Ver quién te dio 'like'", isIncluded: false },
-    { text: "Traducción automática en el chat", isIncluded: false },
     { text: "Filtros de búsqueda avanzados", isIncluded: false },
   ],
 };
@@ -72,9 +68,7 @@ const superPremiumPlan: Plan = {
   features: [
     { text: "Deslizamiento X2", isIncluded: true },
     { text: "Deslizamiento ilimitado", isIncluded: true },
-    { text: "5 'Super Likes' diarios", isIncluded: true },
     { text: "Ver quién te dio 'like'", isIncluded: true },
-    { text: "Traducción automática en el chat", isIncluded: true },
     { text: "Filtros de búsqueda avanzados", isIncluded: true },
   ],
 };

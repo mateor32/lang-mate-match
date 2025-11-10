@@ -1,3 +1,5 @@
+// backend/controllers/likesController.js
+
 import { pool } from "../db.js";
 
 // LÍMITES DE DEPURACIÓN BAJOS para pruebas inmediatas de restricción
@@ -11,11 +13,33 @@ const LIKE_LIMITS = {
  * Obtiene el plan actual del usuario (consulta la tabla suscripciones)
  */
 const getUserPlan = async (userId) => {
-  // ... (código sin cambios)
+  try {
+    const result = await pool.query(
+      `SELECT
+        s.plan_nombre
+      FROM
+        public.suscripciones s
+      WHERE
+        s.usuario_id = $1 AND s.fecha_fin > NOW() AND s.estado = 'activo'`,
+      [userId]
+    );
+
+    if (result.rows.length > 0) {
+      // Devuelve el nombre del plan activo
+      return result.rows[0].plan_nombre;
+    }
+
+    // Si no hay suscripción activa o no existe, es 'Gratis'
+    return "Gratis";
+  } catch (err) {
+    console.error("Error al obtener el plan del usuario:", err);
+    return "Gratis";
+  }
 };
 
 /**
  * Middleware para manejar el registro de un nuevo like, aplicando los límites del plan.
+ * Se han añadido correcciones para manejar valores NULL de la base de datos.
  */
 export const handleLikeLimit = async (req, res, next) => {
   const swiperId = req.body.swiper_id;
@@ -29,7 +53,9 @@ export const handleLikeLimit = async (req, res, next) => {
 
   // 1. Obtener el plan del usuario
   const plan = await getUserPlan(swiperIdInt);
-  const limit = LIKE_LIMITS[plan];
+  // Aseguramos que el plan exista en LIKE_LIMITS para evitar un error.
+  const limit =
+    LIKE_LIMITS[plan] !== undefined ? LIKE_LIMITS[plan] : LIKE_LIMITS.Gratis;
 
   if (limit === Infinity) {
     console.log(
@@ -51,15 +77,14 @@ export const handleLikeLimit = async (req, res, next) => {
       return res.status(404).json({ error: "Usuario swiper no encontrado." });
     }
 
-    const { daily_likes_count, last_like_reset } = checkResult.rows[0];
+    // **CORRECCIÓN CLAVE:** Manejar valores NULL de la DB para ser más robustos
+    let { daily_likes_count, last_like_reset } = checkResult.rows[0];
+    daily_likes_count = daily_likes_count || 0; // Si es NULL, usar 0
 
     const now = new Date();
-    const lastReset = new Date(last_like_reset);
+    // Si last_like_reset es NULL, usamos una fecha antigua para forzar el reinicio
+    const lastReset = last_like_reset ? new Date(last_like_reset) : new Date(0);
 
-    // Lógica de reinicio: Se reinicia si es la primera vez (null/default) O si han pasado 24h
-    // Nota: toDateString es la forma más simple, pero la más propensa a fallos de TZ.
-    // Usaremos el mismo toDateString, ya que es el estándar en el código, pero el problema
-    // puede ser el valor inicial en la DB.
     const isNewDay = now.toDateString() !== lastReset.toDateString();
 
     let newCount = daily_likes_count;
@@ -105,5 +130,61 @@ export const handleLikeLimit = async (req, res, next) => {
     res
       .status(500)
       .json({ error: "Error interno al verificar el límite de likes." });
+  }
+};
+
+/**
+ * Lógica para registrar el like y chequear el match (extraída de server.js para centralizar)
+ */
+export const registerLikeAndCheckMatch = async (req, res) => {
+  const { swiper_id, swiped_id } = req.body;
+  const swiperId = parseInt(swiper_id, 10);
+  const swipedId = parseInt(swiped_id, 10);
+
+  if (swiperId === swipedId) {
+    return res.status(400).json({ error: "No se puede dar like a uno mismo" });
+  }
+
+  try {
+    // 1. Intentar registrar el like unilateral
+    await pool.query(
+      `INSERT INTO likes (usuario1_id, usuario2_id) 
+       VALUES ($1, $2)
+       ON CONFLICT (usuario1_id, usuario2_id) DO NOTHING`,
+      [swiperId, swipedId]
+    );
+
+    // 2. Verificar si existe un like recíproco (Match Mutuo)
+    const reciprocalLike = await pool.query(
+      `SELECT * FROM likes 
+       WHERE usuario1_id = $1 AND usuario2_id = $2`,
+      [swipedId, swiperId]
+    );
+
+    const matchFound = reciprocalLike.rows.length > 0;
+
+    if (matchFound) {
+      // 3. Limpiar likes unilaterales después del match
+      await pool.query(
+        `DELETE FROM likes 
+         WHERE (usuario1_id = $1 AND usuario2_id = $2)
+            OR (usuario1_id = $2 AND usuario2_id = $1)`,
+        [swiperId, swipedId]
+      );
+
+      console.log(
+        `[MATCH MUTUO] between ${swiperId} and ${swipedId}. Likes eliminados.`
+      );
+
+      return res.json({ matchFound: true, swiper_id, swiped_id });
+    }
+
+    // 4. Si no hay match
+    res.json({ matchFound: false });
+  } catch (err) {
+    console.error("Error en la gestión de likes:", err);
+    res
+      .status(500)
+      .json({ error: "Error interno del servidor al procesar like" });
   }
 };

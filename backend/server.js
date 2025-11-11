@@ -106,14 +106,6 @@ app.get("/api/usuarios", async (req, res) => {
                   AND ui_b.usuario_id = u.id
             )
             
-            -- CRITERIO 3: FILTRO DE GÉNERO (Usuario logueado prefiere el género del otro)
-            AND ($2 = 'Todos' OR $2 = u.sexo)
-            
-            -- CRITERIO 4: FILTRO DE PAÍS (ELIMINADO por solicitud del usuario)
-            -- AND ($3 IS NULL OR ($3::INTEGER) = u.pais_id)
-            
-            -- CRITERIO 5: FILTRO RECÍPROCO - El otro usuario debe aceptar el género del usuario logueado
-            AND (u.pref_sexo = 'Todos' OR u.pref_sexo = $4)
 
         ORDER BY
             u.id
@@ -141,12 +133,10 @@ app.get("/api/usuarios", async (req, res) => {
         );
         console.error("Parámetros de consulta:", queryParams);
         // Return specific error to client
-        return res
-          .status(500)
-          .json({
-            error: "Error en la lógica de recomendación SQL",
-            details: sqlRecError.message,
-          });
+        return res.status(500).json({
+          error: "Error en la lógica de recomendación SQL",
+          details: sqlRecError.message,
+        });
       }
 
       if (recommendedIds.length === 0) {

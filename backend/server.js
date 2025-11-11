@@ -74,8 +74,8 @@ app.get("/api/usuarios", async (req, res) => {
         WHERE
             u.id != $1
             -- Excluir a los que el usuario logueado ya deslizó (se asume que los likes van a 'likes')
-            AND u.id NOT IN (SELECT swiped_id FROM likes WHERE swiper_id = $1)
-            AND $1 NOT IN (SELECT swiped_id FROM likes WHERE swiper_id = u.id)
+            AND u.id NOT IN (SELECT usuario2_id FROM likes WHERE usuario1_id = $1)
+            AND $1 NOT IN (SELECT usuario2_id FROM likes WHERE usuario1_id = u.id)
             
             -- CRITERIO 1: Compatibilidad Mutua de Idiomas (Aprende/Nativo)
             -- A Aprende (tipo 'aprender') el que B es Nativo (tipo 'nativo')
@@ -144,12 +144,10 @@ app.get("/api/usuarios", async (req, res) => {
           loggedUserGender,
         ]);
         // Return specific error to client
-        return res
-          .status(500)
-          .json({
-            error: "Error en la lógica de recomendación SQL",
-            details: sqlRecError.message,
-          });
+        return res.status(500).json({
+          error: "Error en la lógica de recomendación SQL",
+          details: sqlRecError.message,
+        });
       }
 
       if (recommendedIds.length === 0) {

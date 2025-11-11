@@ -463,7 +463,6 @@ export default function ProfileSettings() {
                   {...register("sexo")}
                   className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
                 >
-                  <option value="">Selecciona tu género</option>
                   <option value="Hombre">Hombre</option>
                   <option value="Mujer">Mujer</option>
                 </select>

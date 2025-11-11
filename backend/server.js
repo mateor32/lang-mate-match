@@ -109,8 +109,8 @@ app.get("/api/usuarios", async (req, res) => {
             AND ($2 = 'Todos' OR $2 = u.sexo)
             
             -- CRITERIO 4: FILTRO DE PAÍS (Usuario logueado prefiere el país del otro)
-            -- $3 es NULL si se seleccionó 'Todos' en el frontend.
-            AND ($3 IS NULL OR $3 = u.pais_id)
+            -- FIX: Se aplica CASTING a $3 para ayudar a PostgreSQL a determinar el tipo (INTEGER).
+            AND ($3 IS NULL OR ($3::INTEGER) = u.pais_id)
             
             -- CRITERIO 5: FILTRO RECÍPROCO - El otro usuario debe aceptar el género del usuario logueado
             AND (u.pref_sexo = 'Todos' OR u.pref_sexo = $4)

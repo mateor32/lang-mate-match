@@ -64,7 +64,8 @@ app.get("/api/usuarios", async (req, res) => {
         pref_pais_id,
         sexo: loggedUserGender,
       } = loggedUserPrefsResult.rows[0];
-      // 1. Consulta SQL para obtener los IDs de los usuarios recomendados
+
+      // 1. Consulta SQL para obtener los IDs de los usuarios recomendados - ACTUALIZADA
       const recommendationsQuery = `
         SELECT
             u.id
@@ -103,7 +104,8 @@ app.get("/api/usuarios", async (req, res) => {
                 WHERE ui_a.usuario_id = $1
                   AND ui_b.usuario_id = u.id
             )
-                  -- CRITERIO 3: FILTRO DE GÉNERO (Usuario logueado prefiere el género del otro)
+            
+            -- CRITERIO 3: FILTRO DE GÉNERO (Usuario logueado prefiere el género del otro)
             AND ($2 = 'Todos' OR $2 = u.sexo)
             
             -- CRITERIO 4: FILTRO DE PAÍS (Usuario logueado prefiere el país del otro)
@@ -112,6 +114,7 @@ app.get("/api/usuarios", async (req, res) => {
             
             -- CRITERIO 5: FILTRO RECÍPROCO - El otro usuario debe aceptar el género del usuario logueado
             AND (u.pref_sexo = 'Todos' OR u.pref_sexo = $4)
+
         ORDER BY
             u.id
       `;
@@ -129,7 +132,7 @@ app.get("/api/usuarios", async (req, res) => {
       }
 
       // 2. Consulta los datos completos de los usuarios recomendados
-      // Usamos = ANY($1) para pasar un array de IDs a la consulta PostgreSQL
+      // Añadir JOIN para incluir el nombre del país
       const placeholders = recommendedIds.map((_, i) => `$${i + 1}`).join(",");
       const finalQuery = `SELECT u.*, p.nombre as pais_nombre 
                           FROM usuarios u
@@ -180,7 +183,7 @@ app.get("/api/usuarios", async (req, res) => {
   }
 });
 
-// Ruta: obtener un usuario por su ID
+// Ruta: obtener un usuario por su ID - ACTUALIZADA
 app.get("/api/usuarios/:id", async (req, res) => {
   try {
     const { id } = req.params;

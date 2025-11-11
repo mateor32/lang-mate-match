@@ -93,6 +93,7 @@ export default function ProfileSettings() {
     register,
     handleSubmit,
     reset,
+    watch, // Necesario para la vista previa de la foto
     formState: { isSubmitting },
   } = form;
 
@@ -161,7 +162,7 @@ export default function ProfileSettings() {
       const availableLanguagesData = langRes.ok ? await langRes.json() : [];
       const availableInterestsData = intRes.ok ? await intRes.json() : [];
       const availableNivelesData = nivelRes.ok ? await nivelRes.json() : [];
-      const availablePaisesData = paisRes.ok ? await paisRes.json() : []; // <--- NEW
+      const availablePaisesData = paisRes.ok ? await paisRes.json() : [];
       setAvailableLanguages(availableLanguagesData);
       setAvailableInterests(availableInterestsData);
       setAvailableNiveles(availableNivelesData);
@@ -277,9 +278,9 @@ export default function ProfileSettings() {
       );
 
       // 2. Actualizar Idiomas (CON NIVELES)
+      // ... (Resto de la lógica de idiomas) ...
       const idiomasToUpdate = [];
 
-      // Añadir idiomas nativos
       selectedNativos.forEach((langId) => {
         idiomasToUpdate.push({
           langId,
@@ -288,12 +289,10 @@ export default function ProfileSettings() {
         });
       });
 
-      // Añadir idiomas a aprender (con nivel)
       selectedAprendiendo.forEach((langId) => {
         idiomasToUpdate.push({
           langId,
           tipo: "aprender",
-          // Mapea el nivel seleccionado o null si no se eligió
           nivelId: aprendiendoLevels[langId],
         });
       });
@@ -352,7 +351,6 @@ export default function ProfileSettings() {
     } catch (error) {
       console.error("Error al guardar el perfil:", error);
       // Aquí puedes mostrar un toast con el error
-      // alert(error.message);
     }
   };
 
@@ -360,6 +358,13 @@ export default function ProfileSettings() {
     return <p className="text-center mt-10">Cargando configuración...</p>;
   if (!currentUser)
     return <p className="text-center mt-10">No se pudo cargar el perfil.</p>;
+
+  // Función auxiliar para obtener el nombre del país para el placeholder (opcional)
+  const getPaisName = (id: number | null | undefined) => {
+    const pais = availablePaises.find((p) => p.id === id);
+    return pais ? pais.nombre : id === 0 ? "Todos los países" : "Selecciona...";
+  };
+
   return (
     <div className="max-w-xl mx-auto py-8">
       <Card>
@@ -382,55 +387,52 @@ export default function ProfileSettings() {
 
         <CardContent className="p-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Sección Perfil Básico */}
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold border-b pb-2">
-                Información Básica
-              </h3>
+            {/* Sección de Foto y Nombre */}
+            <div className="flex items-center gap-6">
+              <div className="relative">
+                <Avatar className="w-24 h-24 shadow-md">
+                  <AvatarImage src={currentUser.foto} />
+                  <AvatarFallback className="text-2xl">
+                    {currentUser.nombre.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon"
+                  className="absolute bottom-0 right-0 h-8 w-8 rounded-full"
+                  title="Subir nueva foto"
+                >
+                  <Upload className="w-4 h-4" />
+                </Button>
+              </div>
 
-              <div className="flex flex-col md:flex-row items-center gap-6">
-                {/* 1. Foto de Perfil */}
-                <div className="flex-shrink-0">
-                  <Label htmlFor="foto">Foto de Perfil</Label>
-                  <Avatar className="w-24 h-24 mt-2">
-                    <AvatarImage src={currentUser.foto} />
-                    <AvatarFallback className="text-2xl">
-                      {currentUser.nombre.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Input
-                    id="foto"
-                    {...register("foto")}
-                    placeholder="URL de la foto (opcional)"
-                    className="mt-2 w-full max-w-xs"
-                  />
-                </div>
-
-                {/* 2. Nombre y Bio */}
-                <div className="flex-grow space-y-4 w-full">
-                  <div className="space-y-1">
-                    <Label htmlFor="nombre">Nombre</Label>
-                    <Input
-                      id="nombre"
-                      {...register("nombre")}
-                      className="text-lg font-semibold"
-                      placeholder="Tu nombre"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="bio">Biografía</Label>
-                    <Textarea
-                      id="bio"
-                      {...register("bio")}
-                      placeholder="Cuéntale al mundo sobre ti..."
-                      rows={3}
-                    />
-                  </div>
-                </div>
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="nombre">Nombre</Label>
+                <Input
+                  id="nombre"
+                  {...register("nombre")}
+                  className="text-lg font-semibold"
+                  placeholder="Tu nombre"
+                />
               </div>
             </div>
 
-            {/* NEW: País y Género Personal */}
+            {/* Bio */}
+            <div className="space-y-1">
+              <Label htmlFor="bio">Biografía</Label>
+              <Textarea
+                id="bio"
+                {...register("bio")}
+                placeholder="Cuéntale al mundo sobre ti..."
+                rows={4}
+              />
+            </div>
+
+            {/* -------------------------------------- */}
+            {/* NEW/UPDATED: País, Género y Preferencias */}
+            {/* -------------------------------------- */}
+
             <hr className="my-6" />
             <h3 className="text-xl font-semibold mb-3">Tu Perfil Básico</h3>
 
@@ -580,7 +582,7 @@ export default function ProfileSettings() {
                         >
                           {lang.nombre}
                         </Label>
-                        {/* NUEVO: Selector de nivel si la casilla está marcada */}
+                        {/* Selector de nivel si la casilla está marcada */}
                         {isSelected && (
                           <select
                             value={currentLevel}

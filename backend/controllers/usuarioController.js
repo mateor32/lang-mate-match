@@ -17,7 +17,7 @@ export const getIdiomas = async (req, res) => {
   }
 };
 
-GET / api / usuarios / paises;
+// GET /api/usuarios/paises
 export const getPaises = async (req, res) => {
   try {
     const result = await pool.query(
@@ -66,10 +66,10 @@ export const getInteresesByUsuario = async (req, res) => {
 // Rutas de Escritura (PUT/PATCH)
 // -----------------------------------------------------------
 
-// PUT /api/usuarios/:id (Perfil Básico)
+// PUT /api/usuarios/:id (Perfil Básico) - ACTUALIZADO
 export const updateUsuario = async (req, res) => {
   const { id } = req.params;
-  // La desestructuración toma los valores del cuerpo de la petición.
+  // Añadir los nuevos campos a la desestructuración
   const { nombre, bio, foto, pais_id, sexo, pref_pais_id, pref_sexo } =
     req.body;
 
@@ -78,7 +78,7 @@ export const updateUsuario = async (req, res) => {
 
   // Parsear y establecer valores por defecto para los nuevos campos
   const parsedPaisId = pais_id ? parseInt(pais_id, 10) : null;
-  // FIX: Si pref_pais_id es 0 (Todos), guardamos NULL en la DB, evitando el error de FK.
+  // FIX: Si pref_pais_id es 0 (Todos), guardamos NULL en la DB, ya que 0 no existe como FK.
   const parsedPrefPaisId =
     pref_pais_id && parseInt(pref_pais_id, 10) !== 0
       ? parseInt(pref_pais_id, 10)

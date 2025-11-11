@@ -7,7 +7,7 @@ interface User {
   id: number;
   nombre: string;
   edad: number;
-  pais_nombre: string; // UPDATED
+  pais_nombre: string; // UPDATED: Usar nombre del país
   // <--- INTERFAZ ACTUALIZADA PARA INCLUIR NIVELES DE IDIOMA --->
   usuario_idioma?: {
     tipo: string;
@@ -73,10 +73,7 @@ const UserCard = ({ user, onLike, onDislike, isAnimating }: UserCardProps) => {
               {user.usuario_idioma
                 ?.filter((i) => i.tipo === "nativo")
                 .map((i, idx) => (
-                  <Badge
-                    key={idx}
-                    // Quitar la clase flex-col para forzar una sola línea
-                  >
+                  <Badge key={idx}>
                     <span className="font-semibold">{i.nombre}</span>
                     {/* Renderiza el nivel más sutilmente */}
                     {i.nivel_nombre && (

@@ -59,6 +59,7 @@ app.get("/api/usuarios", async (req, res) => {
         return res
           .status(404)
           .json({ error: "Usuario logueado no encontrado." });
+      // Mantener pref_pais_id aquí, aunque ya no se usará en el WHERE, para mantener la consistencia de parámetros ($2, $3, $4)
       const {
         pref_sexo,
         pref_pais_id,
@@ -73,7 +74,7 @@ app.get("/api/usuarios", async (req, res) => {
             usuarios u
         WHERE
             u.id != $1
-            -- Excluir a los que el usuario logueado ya deslizó (se asume que los likes van a 'likes')
+            -- FIX LIKES: Usar usuario1_id (swiper) y usuario2_id (swiped)
             AND u.id NOT IN (SELECT usuario2_id FROM likes WHERE usuario1_id = $1)
             AND $1 NOT IN (SELECT usuario2_id FROM likes WHERE usuario1_id = u.id)
             
@@ -108,9 +109,8 @@ app.get("/api/usuarios", async (req, res) => {
             -- CRITERIO 3: FILTRO DE GÉNERO (Usuario logueado prefiere el género del otro)
             AND ($2 = 'Todos' OR $2 = u.sexo)
             
-            -- CRITERIO 4: FILTRO DE PAÍS (Usuario logueado prefiere el país del otro)
-            -- FIX: Se aplica CASTING a $3 para ayudar a PostgreSQL a determinar el tipo (INTEGER).
-            AND ($3 IS NULL OR ($3::INTEGER) = u.pais_id)
+            -- CRITERIO 4: FILTRO DE PAÍS (ELIMINADO por solicitud del usuario)
+            -- AND ($3 IS NULL OR ($3::INTEGER) = u.pais_id)
             
             -- CRITERIO 5: FILTRO RECÍPROCO - El otro usuario debe aceptar el género del usuario logueado
             AND (u.pref_sexo = 'Todos' OR u.pref_sexo = $4)
@@ -122,14 +122,16 @@ app.get("/api/usuarios", async (req, res) => {
       let recommendedIdsResult;
       let recommendedIds;
 
+      // Se usa un array de parámetros sin el valor de país ($3) en el índice,
+      // ya que la consulta ya no lo necesita.
+      const queryParams = [loggedUserId, pref_sexo, loggedUserGender];
+
       try {
         // --- CRITICAL QUERY EXECUTION ---
-        recommendedIdsResult = await pool.query(recommendationsQuery, [
-          loggedUserId,
-          pref_sexo,
-          pref_pais_id,
-          loggedUserGender,
-        ]);
+        recommendedIdsResult = await pool.query(
+          recommendationsQuery,
+          queryParams
+        );
         recommendedIds = recommendedIdsResult.rows.map((row) => row.id);
       } catch (sqlRecError) {
         // Explicit logging for the complex recommendation query failure
@@ -137,17 +139,14 @@ app.get("/api/usuarios", async (req, res) => {
           "Error SQL en la consulta de recomendaciones:",
           sqlRecError.message
         );
-        console.error("Parámetros de consulta:", [
-          loggedUserId,
-          pref_sexo,
-          pref_pais_id,
-          loggedUserGender,
-        ]);
+        console.error("Parámetros de consulta:", queryParams);
         // Return specific error to client
-        return res.status(500).json({
-          error: "Error en la lógica de recomendación SQL",
-          details: sqlRecError.message,
-        });
+        return res
+          .status(500)
+          .json({
+            error: "Error en la lógica de recomendación SQL",
+            details: sqlRecError.message,
+          });
       }
 
       if (recommendedIds.length === 0) {

@@ -460,7 +460,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                             <span className="font-semibold">{i.nombre}</span>
                             {i.nivel_nombre && (
                               <span className="ml-1 text-xs font-normal opacity-75">
-                                + - {i.nivel_nombre}
+                                - {i.nivel_nombre}
                               </span>
                             )}
                           </Badge>

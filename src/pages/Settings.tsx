@@ -466,8 +466,6 @@ export default function ProfileSettings() {
                   <option value="">Selecciona tu género</option>
                   <option value="Hombre">Hombre</option>
                   <option value="Mujer">Mujer</option>
-                  <option value="Otro">Otro</option>
-                  <option value="Prefiero no decir">Prefiero no decir</option>
                 </select>
               </div>
             </div>
@@ -510,7 +508,6 @@ export default function ProfileSettings() {
                   <option value="Todos">Todos los géneros</option>
                   <option value="Hombre">Hombre</option>
                   <option value="Mujer">Mujer</option>
-                  <option value="Otro">Otro</option>
                 </select>
               </div>
             </div>

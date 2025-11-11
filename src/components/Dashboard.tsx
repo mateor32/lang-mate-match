@@ -1,4 +1,3 @@
-// mateor32/lang-mate-match/mateor32-lang-mate-match-13c709073e7292ab8e58547abd2a20fbcfde7497/src/components/Dashboard.tsx
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,14 +37,29 @@ const API_BASE_URL =
   "http://localhost:10000" ||
   "http://localhost:5000";
 
+// Interfaz local para el componente Dashboard (SOLUCIONA ERRORES DE TIPADO)
+interface UserDashboard extends User {
+  // Se extiende User para añadir la definición local de usuario_idioma con niveles,
+  // ya que la importación de User puede variar.
+  usuario_idioma?: {
+    tipo: string;
+    id: number;
+    nombre: string;
+    nivel_id?: number;
+    nivel_nombre?: string;
+  }[];
+  // Se corrige la opcionalidad de bio para que coincida con UserCard y ChatWindow
+  bio: string;
+  // Aseguramos que intereses sea el tipo correcto para ChatWindow
+  intereses?: { id: number; nombre: string }[];
+}
+
 interface DashboardProps {
   onLogout: () => void;
   userId: number; // CLAVE: La prop debe ser 'userId: number'
 }
 
 type ViewType = "discover" | "matches" | "chat";
-
-// **CLAVE: Definir URL Base para la API**
 
 // 1. Recibir userId como prop
 const Dashboard = ({ onLogout, userId }: DashboardProps) => {
@@ -57,13 +71,14 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
   } = useUsuarios(userId);
   const [currentUserIndex, setCurrentUserIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [matchedUser, setMatchedUser] = useState<User | null>(null);
-  const [matches, setMatches] = useState<User[]>([]);
+  const [matchedUser, setMatchedUser] = useState<UserDashboard | null>(null); // Usar interfaz local
+  const [matches, setMatches] = useState<UserDashboard[]>([]); // Usar interfaz local
   const [currentView, setCurrentView] = useState<ViewType>("discover");
-  const [selectedChatUser, setSelectedChatUser] = useState<User | null>(null);
+  const [selectedChatUser, setSelectedChatUser] =
+    useState<UserDashboard | null>(null); // Usar interfaz local
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null); // <-- NUEVO ESTADO
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserDashboard | null>(null); // Usar interfaz local
   const [userPlan, setUserPlan] = useState<
     "Gratis" | "Premium" | "Super Premium"
   >("Gratis");
@@ -100,7 +115,13 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
         // Aseguramos que data.idiomas sea un array
         const idiomasArray = Array.isArray(data.idiomas) ? data.idiomas : [];
 
-        const usuarioBD: User = {
+        // Aseguramos que data.intereses sea un array (no se recibe intereses en /api/usuarios/:id)
+        const interesesRes = await fetch(
+          `${API_BASE_URL}/api/usuarios/${userId}/intereses`
+        );
+        const interesesData = interesesRes.ok ? await interesesRes.json() : [];
+
+        const usuarioBD: UserDashboard = {
           id: data.id,
           nombre: data.nombre,
           // 3. CLAVE: Usamos la foto real (columna 'foto' de su DB)
@@ -108,10 +129,13 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
             data.foto ||
             "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
 
-          usuario_idioma: idiomasArray.map((i: any, index: number) => ({
+          // Mapeamos los idiomas y sus niveles
+          usuario_idioma: idiomasArray.map((i: any) => ({
             nombre: i.nombre,
-            id: data.id,
-            tipo: i.tipo, // Asegurarse de usar el tipo real de la DB
+            id: i.id, // Usamos el ID del idioma, no el del usuario
+            tipo: i.tipo,
+            nivel_id: i.nivel_id,
+            nivel_nombre: i.nivel_nombre,
           })),
           edad: data.fecha_nacimiento
             ? new Date().getFullYear() -
@@ -119,6 +143,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
             : 0,
           pais: data.pais || "",
           bio: data.bio || "",
+          intereses: interesesData, // Incluimos intereses
         };
         setCurrentUser(usuarioBD);
       } catch (err) {
@@ -132,20 +157,28 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
   if (!currentUser) return <p>Cargando perfil...</p>;
 
   // Lista de usuarios convertida a tipo User (filtrando al usuario logueado)
-  const users: User[] = usuarios
+  const users: UserDashboard[] = usuarios
     .filter((u) => u.id !== currentUser.id)
-    .map((u: any) => usuarioToUser(u as Usuario));
+    .map((u: any) => usuarioToUser(u as Usuario) as UserDashboard); // Conversión forzada
   const currentCardUser = users[currentUserIndex];
 
   const saveMatch = async (userId1: number, userId2: number) => {
     try {
+      // 1. Guardar el Match en la tabla 'matches'
       const res = await fetch(`${API_BASE_URL}/api/matches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usuario1_id: userId1, usuario2_id: userId2 }), // ✅ corregido
+        body: JSON.stringify({ usuario1_id: userId1, usuario2_id: userId2 }),
       });
 
-      if (!res.ok) throw new Error("Error guardando match");
+      if (!res.ok) {
+        const errorData = await res.json();
+        if (res.status === 400 && errorData.error === "El match ya existe") {
+          console.warn("Match ya existe, continuando...");
+        } else {
+          throw new Error(`Error guardando match: ${errorData.error}`);
+        }
+      }
 
       const data = await res.json();
       console.log("Match guardado:", data);
@@ -163,22 +196,33 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
         const userId2 = currentCardUser.id; // Usuario que recibe el "like"
 
         // 1. ENVIAR LIKE y CHEQUEAR MUTUALIDAD en el backend
-        const likeResponse = await fetch(`${API_BASE_URL}/api/likes`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            swiper_id: userId1,
-            swiped_id: userId2,
-          }),
-        });
+        let likeResponse;
+        let likeData;
+
+        try {
+          likeResponse = await fetch(`${API_BASE_URL}/api/likes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              swiper_id: userId1,
+              swiped_id: userId2,
+            }),
+          });
+          likeData = await likeResponse.json();
+        } catch (error) {
+          console.error("Error al comunicarse con la API de likes:", error);
+          setIsAnimating(false);
+          return;
+        }
 
         // 2. CLAVE: Manejar la respuesta de límite de likes
         if (likeResponse.status === 403) {
-          const errorData = await likeResponse.json();
-          // ⬅️ CAMBIO CLAVE: Usar setLikeError en lugar de alert()
+          // ⬅️ Manejo del límite
           setLikeError({
             title: "Límite Diario Alcanzado",
-            message: errorData.message, // El mensaje viene del backend
+            message:
+              likeData.message ||
+              "Tu límite de likes diario ha sido alcanzado.",
           });
 
           setIsAnimating(false);
@@ -191,12 +235,9 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
           return;
         }
 
-        const likeData = await likeResponse.json();
-
-        // 2. AHORA: solo si el backend confirma un match mutuo
+        // 3. Lógica de Match Mutuo (Corregida)
         if (likeData.matchFound) {
-          // <--- AQUÍ ES DONDE VA EL BLOQUE
-          setMatchedUser(currentCardUser); // Muestra el modal de MatchModal
+          setMatchedUser(currentCardUser); // ✅ Muestra el modal de MatchModal
           setMatches((prev) => [...prev, currentCardUser]); // Actualiza la lista de matches en el estado local
 
           // Guardar el match en la base de datos (tabla 'matches')
@@ -233,7 +274,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
   };
 
   // CLAVE: Recibe el ID del match y el usuario para la ventana de chat
-  const handleSelectChat = (matchId: number, user: User) => {
+  const handleSelectChat = (matchId: number, user: UserDashboard) => {
     setSelectedMatchId(matchId); // Guarda el ID del match
     setSelectedChatUser(user);
     setCurrentView("chat");
@@ -390,9 +431,14 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                         .map((i, idx) => (
                           <Badge
                             key={idx}
-                            className="bg-accent/10 text-accent border-accent/20 mr-1"
+                            className="bg-accent/10 text-accent border-accent/20 mr-1 flex flex-col items-start gap-0.5"
                           >
-                            {i.nombre}
+                            <span className="font-semibold">{i.nombre}</span>
+                            {i.nivel_nombre && (
+                              <span className="text-[0.65rem] font-normal opacity-75">
+                                {i.nivel_nombre}
+                              </span>
+                            )}
                           </Badge>
                         )) || <Badge variant="outline">Sin idioma</Badge>}
                     </div>
@@ -407,9 +453,14 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                           <Badge
                             key={idx}
                             variant="outline"
-                            className="border-primary/20 text-primary mr-1"
+                            className="border-primary/20 text-primary mr-1 flex flex-col items-start gap-0.5"
                           >
-                            {i.nombre}
+                            <span className="font-semibold">{i.nombre}</span>
+                            {i.nivel_nombre && (
+                              <span className="text-[0.65rem] font-normal opacity-75">
+                                {i.nivel_nombre}
+                              </span>
+                            )}
                           </Badge>
                         )) || <Badge variant="outline">Sin idioma</Badge>}
                     </div>
@@ -491,6 +542,11 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
           </div>
         </div>
       </div>
+
+      {/* ⬅️ MODAL DE MATCH MUTUO (si matchedUser está seteado) */}
+      {matchedUser && (
+        <MatchModal user={matchedUser} onClose={closeMatchModal} />
+      )}
 
       {/* ⬅️ NUEVO MODAL: Error de Límite de Likes (DISEÑO MEJORADO) */}
       <AlertDialog open={!!likeError} onOpenChange={() => setLikeError(null)}>

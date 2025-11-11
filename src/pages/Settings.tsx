@@ -1,16 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { ArrowLeft, User as UserIcon, Save, Upload } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query"; // Importación necesaria
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils"; // <-- CORRECCIÓN: Importación agregada
+import { cn } from "@/lib/utils";
 
 // **CLAVE: Definir URL Base para la API**
 const API_BASE_URL =
@@ -28,13 +34,18 @@ interface User {
   id: number;
   nombre: string;
   edad: number;
-  pais: string;
+  // NEW/UPDATED FIELDS
+  pais_id: number | null;
+  pais_nombre?: string;
+  sexo: string | null;
+  pref_pais_id: number | null;
+  pref_sexo: string | null;
   usuario_idioma?: {
     tipo: string;
     id: number;
     nombre: string;
-    nivel_id?: number; // <-- Nuevo campo
-    nivel_nombre?: string; // <-- Nuevo campo
+    nivel_id?: number;
+    nivel_nombre?: string;
   }[];
   intereses?: Resource[];
   foto: string;
@@ -45,8 +56,12 @@ interface User {
 interface ProfileFormValues {
   nombre: string;
   bio: string;
-  pais: string;
   foto: string;
+  // NEW FIELDS FOR FORM SUBMISSION
+  pais_id: number | null;
+  sexo: string | null;
+  pref_pais_id: number | null;
+  pref_sexo: string | null;
 }
 
 // ------------------------------------------
@@ -57,19 +72,20 @@ export default function ProfileSettings() {
   const loggedUserId = localStorage.getItem("loggedUserId");
   const userId = loggedUserId ? parseInt(loggedUserId, 10) : null;
 
-  const queryClient = useQueryClient(); // Inicializar React Query Client
+  const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Estados para recursos disponibles y selecciones
   const [availableLanguages, setAvailableLanguages] = useState<Resource[]>([]);
   const [availableInterests, setAvailableInterests] = useState<Resource[]>([]);
-  const [availableNiveles, setAvailableNiveles] = useState<Resource[]>([]); // <-- Nuevo estado para niveles
+  const [availableNiveles, setAvailableNiveles] = useState<Resource[]>([]);
+  const [availablePaises, setAvailablePaises] = useState<Resource[]>([]); // <--- NEW STATE
   const [selectedNativos, setSelectedNativos] = useState<number[]>([]);
   const [selectedAprendiendo, setSelectedAprendiendo] = useState<number[]>([]);
   const [aprendiendoLevels, setAprendiendoLevels] = useState<
     Record<number, number | null>
-  >({}); // <-- Nuevo estado para mapear IDs de idioma a IDs de nivel
+  >({});
   const [selectedIntereses, setSelectedIntereses] = useState<number[]>([]);
 
   const form = useForm<ProfileFormValues>();
@@ -135,27 +151,29 @@ export default function ProfileSettings() {
       return;
     }
     try {
-      // 1. Fetch recursos disponibles (incluyendo niveles)
-      const [langRes, intRes, nivelRes] = await Promise.all([
+      // 1. Fetch recursos disponibles (incluyendo niveles y PAISES)
+      const [langRes, intRes, nivelRes, paisRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/usuarios/idiomas`),
         fetch(`${API_BASE_URL}/api/usuarios/intereses`),
-        fetch(`${API_BASE_URL}/api/usuarios/niveles`), // <-- NUEVO ENDPOINT
+        fetch(`${API_BASE_URL}/api/usuarios/niveles`),
+        fetch(`${API_BASE_URL}/api/usuarios/paises`), // <--- NEW FETCH
       ]);
       const availableLanguagesData = langRes.ok ? await langRes.json() : [];
       const availableInterestsData = intRes.ok ? await intRes.json() : [];
-      const availableNivelesData = nivelRes.ok ? await nivelRes.json() : []; // <-- NUEVO
+      const availableNivelesData = nivelRes.ok ? await nivelRes.json() : [];
+      const availablePaisesData = paisRes.ok ? await paisRes.json() : []; // <--- NEW
       setAvailableLanguages(availableLanguagesData);
       setAvailableInterests(availableInterestsData);
-      setAvailableNiveles(availableNivelesData); // <-- Esta llamada ya no causa el bucle
+      setAvailableNiveles(availableNivelesData);
+      setAvailablePaises(availablePaisesData); // <--- NEW SET STATE
 
       // 2. Fetch datos del usuario logueado
-      const userRes = await fetch(`${API_BASE_URL}/api/usuarios/${userId}`); // <-- URL CORREGIDA
+      const userRes = await fetch(`${API_BASE_URL}/api/usuarios/${userId}`);
       if (!userRes.ok) throw new Error(`Error cargando usuario ${userId}`);
       const data = await userRes.json();
 
       // 3. Adaptar datos de la API para el estado y formulario
       const idiomasArray = Array.isArray(data.idiomas) ? data.idiomas : [];
-      // Corregido: Usar i.id para mapear IDs
       const nativosIds = idiomasArray
         .filter((i: any) => i.tipo === "nativo")
         .map((i: any) => i.id);
@@ -168,7 +186,6 @@ export default function ProfileSettings() {
       idiomasArray
         .filter((i: any) => i.tipo === "aprender")
         .forEach((i: any) => {
-          // Asumimos que nivel_id viene de la DB (puede ser null)
           initialAprendiendoLevels[i.id] = i.nivel_id
             ? parseInt(i.nivel_id, 10)
             : null;
@@ -176,13 +193,12 @@ export default function ProfileSettings() {
 
       setSelectedNativos(nativosIds);
       setSelectedAprendiendo(aprendiendoIds);
-      setAprendiendoLevels(initialAprendiendoLevels); // <-- NEW
+      setAprendiendoLevels(initialAprendiendoLevels);
 
       const interesesRes = await fetch(
-        `${API_BASE_URL}/api/usuarios/${userId}/intereses` // <-- URL CORREGIDA
+        `${API_BASE_URL}/api/usuarios/${userId}/intereses`
       );
       const interesesData = interesesRes.ok ? await interesesRes.json() : [];
-      // Corregido: Usar i.id para mapear IDs
       const interesesIds = interesesData.map((i: any) => i.id);
 
       setSelectedIntereses(interesesIds);
@@ -190,7 +206,6 @@ export default function ProfileSettings() {
       const user: User = {
         id: data.id,
         nombre: data.nombre,
-        // CLAVE: Asegurarse de que la propiedad del idioma es 'usuario_idioma' para la interfaz User
         usuario_idioma: idiomasArray.map((i: any) => ({
           tipo: i.tipo,
           id: i.id,
@@ -203,7 +218,11 @@ export default function ProfileSettings() {
           ? new Date().getFullYear() -
             new Date(data.fecha_nacimiento).getFullYear()
           : 0,
-        pais: data.pais || "",
+        // NEW/UPDATED FIELDS
+        pais_id: data.pais_id || null,
+        sexo: data.sexo || null,
+        pref_pais_id: data.pref_pais_id || 0, // 0 es el valor para "Todos"
+        pref_sexo: data.pref_sexo || "Todos",
         bio: data.bio || "",
         intereses: interesesData,
       };
@@ -214,15 +233,19 @@ export default function ProfileSettings() {
       reset({
         nombre: user.nombre,
         bio: user.bio || "",
-        pais: user.pais,
         foto: user.foto,
+        // NEW FIELDS
+        pais_id: user.pais_id,
+        sexo: user.sexo,
+        pref_pais_id: user.pref_pais_id,
+        pref_sexo: user.pref_sexo,
       });
     } catch (err) {
       console.error("Error cargando perfil:", err);
     } finally {
       setLoading(false);
     }
-  }, [userId, reset]); // <-- CORRECCIÓN CLAVE: Eliminada la dependencia 'availableNiveles'
+  }, [userId, reset]);
 
   useEffect(() => {
     fetchProfileData();
@@ -234,26 +257,26 @@ export default function ProfileSettings() {
   const onSubmit = async (data: ProfileFormValues) => {
     if (!userId) return;
     try {
-      // Asumiendo que data.foto contiene la URL actual (aunque sea el placeholder)
-
-      // 1. Actualizar Perfil Básico
+      // 1. Actualizar Perfil Básico (CON NUEVOS CAMPOS)
       const basicUpdatePromise = fetch(
         `${API_BASE_URL}/api/usuarios/${userId}`,
         {
-          // <-- URL CORREGIDA
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             nombre: data.nombre,
             bio: data.bio,
-            pais: data.pais,
             foto: data.foto,
+            // NEW FIELDS TO SEND
+            pais_id: data.pais_id,
+            sexo: data.sexo,
+            pref_pais_id: data.pref_pais_id,
+            pref_sexo: data.pref_sexo,
           }),
         }
       );
 
       // 2. Actualizar Idiomas (CON NIVELES)
-      // Construir la estructura de datos que espera el backend (updateIdiomas)
       const idiomasToUpdate = [];
 
       // Añadir idiomas nativos
@@ -276,19 +299,19 @@ export default function ProfileSettings() {
       });
 
       const langUpdatePromise = fetch(
-        `${API_BASE_URL}/api/usuarios/${userId}/idiomas`, // <-- URL CORREGIDA
+        `${API_BASE_URL}/api/usuarios/${userId}/idiomas`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            idiomas: idiomasToUpdate, // <-- NUEVA ESTRUCTURA
+            idiomas: idiomasToUpdate,
           }),
         }
       );
 
       // 3. Actualizar Intereses
       const intUpdatePromise = fetch(
-        `${API_BASE_URL}/api/usuarios/${userId}/intereses`, // <-- URL CORREGIDA
+        `${API_BASE_URL}/api/usuarios/${userId}/intereses`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -307,7 +330,6 @@ export default function ProfileSettings() {
       const allOk = results.every((res) => res.ok);
 
       if (!allOk) {
-        // Manejar errores para saber cuál falló y obtener el mensaje de error del backend
         const failedResponse = results.find((res) => !res.ok);
         const errorBody = failedResponse
           ? await failedResponse.json()
@@ -360,54 +382,135 @@ export default function ProfileSettings() {
 
         <CardContent className="p-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Sección de Foto y Nombre */}
-            <div className="flex items-center gap-6">
-              <div className="relative">
-                <Avatar className="w-24 h-24 shadow-md">
-                  <AvatarImage src={currentUser.foto} />
-                  <AvatarFallback className="text-2xl">
-                    {currentUser.nombre.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="absolute bottom-0 right-0 h-8 w-8 rounded-full"
-                  title="Subir nueva foto"
+            {/* Sección Perfil Básico */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold border-b pb-2">
+                Información Básica
+              </h3>
+
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                {/* 1. Foto de Perfil */}
+                <div className="flex-shrink-0">
+                  <Label htmlFor="foto">Foto de Perfil</Label>
+                  <Avatar className="w-24 h-24 mt-2">
+                    <AvatarImage src={currentUser.foto} />
+                    <AvatarFallback className="text-2xl">
+                      {currentUser.nombre.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <Input
+                    id="foto"
+                    {...register("foto")}
+                    placeholder="URL de la foto (opcional)"
+                    className="mt-2 w-full max-w-xs"
+                  />
+                </div>
+
+                {/* 2. Nombre y Bio */}
+                <div className="flex-grow space-y-4 w-full">
+                  <div className="space-y-1">
+                    <Label htmlFor="nombre">Nombre</Label>
+                    <Input
+                      id="nombre"
+                      {...register("nombre")}
+                      className="text-lg font-semibold"
+                      placeholder="Tu nombre"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="bio">Biografía</Label>
+                    <Textarea
+                      id="bio"
+                      {...register("bio")}
+                      placeholder="Cuéntale al mundo sobre ti..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* NEW: País y Género Personal */}
+            <hr className="my-6" />
+            <h3 className="text-xl font-semibold mb-3">Tu Perfil Básico</h3>
+
+            {/* Fila País y Género Personal */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* País del Usuario */}
+              <div className="space-y-1">
+                <Label htmlFor="pais_id">Tu País (Ubicación)</Label>
+                <select
+                  id="pais_id"
+                  {...register("pais_id", { valueAsNumber: true })}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
                 >
-                  <Upload className="w-4 h-4" />
-                </Button>
+                  <option value={""}>Selecciona tu país</option>
+                  {availablePaises.map((pais) => (
+                    <option key={pais.id} value={pais.id}>
+                      {pais.nombre}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="flex-1 space-y-1">
-                <Label htmlFor="nombre">Nombre</Label>
-                <Input
-                  id="nombre"
-                  {...register("nombre")}
-                  className="text-lg font-semibold"
-                  placeholder="Tu nombre"
-                />
+              {/* Género del Usuario */}
+              <div className="space-y-1">
+                <Label htmlFor="sexo">Tu Género</Label>
+                <select
+                  id="sexo"
+                  {...register("sexo")}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                >
+                  <option value="">Selecciona tu género</option>
+                  <option value="Hombre">Hombre</option>
+                  <option value="Mujer">Mujer</option>
+                  <option value="Otro">Otro</option>
+                  <option value="Prefiero no decir">Prefiero no decir</option>
+                </select>
               </div>
             </div>
 
-            {/* Bio y País */}
-            <div className="space-y-1">
-              <Label htmlFor="bio">Biografía</Label>
-              <Textarea
-                id="bio"
-                {...register("bio")}
-                placeholder="Cuéntale al mundo sobre ti..."
-                rows={4}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="pais">País (Ubicación)</Label>
-              <Input
-                id="pais"
-                {...register("pais")}
-                placeholder="Ej: Colombia"
-              />
+            <hr className="my-6" />
+            <h3 className="text-xl font-semibold mb-3">
+              Preferencias de Match
+            </h3>
+
+            {/* Fila Preferencias de Match */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* País Preferido para Match */}
+              <div className="space-y-1">
+                <Label htmlFor="pref_pais_id">País Preferido</Label>
+                <select
+                  id="pref_pais_id"
+                  {...register("pref_pais_id", { valueAsNumber: true })}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                >
+                  <option value={0}>Todos los países</option>
+                  {availablePaises.map((pais) => (
+                    <option key={pais.id} value={pais.id}>
+                      {pais.nombre}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Filtra por personas de este país.
+                </p>
+              </div>
+
+              {/* Género Preferido para Match */}
+              <div className="space-y-1">
+                <Label htmlFor="pref_sexo">Género Preferido</Label>
+                <select
+                  id="pref_sexo"
+                  {...register("pref_sexo")}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                >
+                  <option value="Todos">Todos los géneros</option>
+                  <option value="Hombre">Hombre</option>
+                  <option value="Mujer">Mujer</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
             </div>
 
             <hr className="my-6" />

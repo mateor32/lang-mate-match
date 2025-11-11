@@ -50,6 +50,20 @@ app.get("/api/usuarios", async (req, res) => {
     if (recommendationsFor) {
       const loggedUserId = parseInt(recommendationsFor, 10);
 
+      // 1. Obtener preferencias y género del usuario logueado
+      const loggedUserPrefsResult = await pool.query(
+        "SELECT pref_sexo, pref_pais_id, sexo FROM usuarios WHERE id = $1",
+        [loggedUserId]
+      );
+      if (loggedUserPrefsResult.rows.length === 0)
+        return res
+          .status(404)
+          .json({ error: "Usuario logueado no encontrado." });
+      const {
+        pref_sexo,
+        pref_pais_id,
+        sexo: loggedUserGender,
+      } = loggedUserPrefsResult.rows[0];
       // 1. Consulta SQL para obtener los IDs de los usuarios recomendados
       const recommendationsQuery = `
         SELECT
@@ -59,7 +73,8 @@ app.get("/api/usuarios", async (req, res) => {
         WHERE
             u.id != $1
             -- Excluir a los que el usuario logueado ya deslizó (se asume que los likes van a 'likes')
-            AND u.id NOT IN (SELECT usuario2_id FROM likes WHERE usuario1_id = $1)
+            AND u.id NOT IN (SELECT swiped_id FROM likes WHERE swiper_id = $1)
+            AND $1 NOT IN (SELECT swiped_id FROM likes WHERE swiper_id = u.id)
             
             -- CRITERIO 1: Compatibilidad Mutua de Idiomas (Aprende/Nativo)
             -- A Aprende (tipo 'aprender') el que B es Nativo (tipo 'nativo')
@@ -88,12 +103,24 @@ app.get("/api/usuarios", async (req, res) => {
                 WHERE ui_a.usuario_id = $1
                   AND ui_b.usuario_id = u.id
             )
+                  -- CRITERIO 3: FILTRO DE GÉNERO (Usuario logueado prefiere el género del otro)
+            AND ($2 = 'Todos' OR $2 = u.sexo)
+            
+            -- CRITERIO 4: FILTRO DE PAÍS (Usuario logueado prefiere el país del otro)
+            -- $3 es NULL si se seleccionó 'Todos' en el frontend.
+            AND ($3 IS NULL OR $3 = u.pais_id)
+            
+            -- CRITERIO 5: FILTRO RECÍPROCO - El otro usuario debe aceptar el género del usuario logueado
+            AND (u.pref_sexo = 'Todos' OR u.pref_sexo = $4)
         ORDER BY
             u.id
       `;
 
       const recommendedIdsResult = await pool.query(recommendationsQuery, [
         loggedUserId,
+        pref_sexo,
+        pref_pais_id,
+        loggedUserGender,
       ]);
       const recommendedIds = recommendedIdsResult.rows.map((row) => row.id);
 
@@ -104,12 +131,18 @@ app.get("/api/usuarios", async (req, res) => {
       // 2. Consulta los datos completos de los usuarios recomendados
       // Usamos = ANY($1) para pasar un array de IDs a la consulta PostgreSQL
       const placeholders = recommendedIds.map((_, i) => `$${i + 1}`).join(",");
-      const finalQuery = `SELECT * FROM usuarios WHERE id IN (${placeholders}) ORDER BY id`;
+      const finalQuery = `SELECT u.*, p.nombre as pais_nombre 
+                          FROM usuarios u
+                          LEFT JOIN paises p ON u.pais_id = p.id
+                          WHERE u.id IN (${placeholders}) ORDER BY id`;
 
       usuariosResult = await pool.query(finalQuery, recommendedIds);
     } else {
       // Comportamiento original: devolver todos los usuarios (e.g., para admin)
-      usuariosResult = await pool.query("SELECT * FROM usuarios");
+      // Añadir JOIN para incluir el nombre del país
+      usuariosResult = await pool.query(
+        "SELECT u.*, p.nombre as pais_nombre FROM usuarios u LEFT JOIN paises p ON u.pais_id = p.id"
+      );
     }
 
     // El resto de la lógica para obtener idiomas e intereses por usuario sigue siendo útil
@@ -153,7 +186,10 @@ app.get("/api/usuarios/:id", async (req, res) => {
     const { id } = req.params;
 
     const userResult = await pool.query(
-      "SELECT * FROM usuarios WHERE id = $1",
+      `SELECT u.*, p.nombre as pais_nombre
+       FROM usuarios u
+       LEFT JOIN paises p ON u.pais_id = p.id
+       WHERE u.id = $1`,
       [id]
     );
     if (userResult.rows.length === 0) {

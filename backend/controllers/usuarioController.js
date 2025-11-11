@@ -17,6 +17,19 @@ export const getIdiomas = async (req, res) => {
   }
 };
 
+GET / api / usuarios / paises;
+export const getPaises = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, nombre FROM paises ORDER BY nombre"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error al obtener países disponibles:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
 // GET /api/usuarios/intereses
 export const getIntereses = async (req, res) => {
   try {
@@ -57,10 +70,21 @@ export const getInteresesByUsuario = async (req, res) => {
 export const updateUsuario = async (req, res) => {
   const { id } = req.params;
   // La desestructuración toma los valores del cuerpo de la petición.
-  const { nombre, bio, pais, foto } = req.body;
+  const { nombre, bio, foto, pais_id, sexo, pref_pais_id, pref_sexo } =
+    req.body;
 
   // Aseguramos que el ID de la URL sea un entero
   const idInt = parseInt(id, 10);
+
+  // Parsear y establecer valores por defecto para los nuevos campos
+  const parsedPaisId = pais_id ? parseInt(pais_id, 10) : null;
+  // FIX: Si pref_pais_id es 0 (Todos), guardamos NULL en la DB, evitando el error de FK.
+  const parsedPrefPaisId =
+    pref_pais_id && parseInt(pref_pais_id, 10) !== 0
+      ? parseInt(pref_pais_id, 10)
+      : null;
+  const parsedSexo = sexo || null;
+  const parsedPrefSexo = pref_sexo || "Todos";
 
   // 🔴 REFUERZO: Validar que el nombre no esté vacío, ya que es un campo crítico.
   if (!nombre || typeof nombre !== "string" || nombre.trim() === "") {
@@ -72,15 +96,18 @@ export const updateUsuario = async (req, res) => {
   try {
     const query = `
             UPDATE usuarios
-            SET nombre = $1, bio = $2, pais = $3, foto = $4
-            WHERE id = $5
+            SET nombre = $1, bio = $2, foto = $3, pais_id = $4, sexo = $5, pref_pais_id = $6, pref_sexo = $7
+            WHERE id = $8
             RETURNING *
         `;
     const result = await pool.query(query, [
       nombre.trim(), // 👈 Valor del nombre, limpio de espacios
       bio,
-      pais,
       foto,
+      parsedPaisId,
+      parsedSexo,
+      parsedPrefPaisId,
+      parsedPrefSexo,
       idInt,
     ]);
 

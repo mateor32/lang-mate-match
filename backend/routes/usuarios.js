@@ -8,6 +8,7 @@ import {
   updateIntereses,
   checkPremiumStatus,
   getNiveles,
+  getPaises,
 } from "../controllers/usuarioController.js"; // Importación directa de las funciones
 
 const router = express.Router();
@@ -17,6 +18,7 @@ router.get("/idiomas", getIdiomas);
 router.get("/intereses", getIntereses);
 router.get("/:id/premium", checkPremiumStatus);
 router.get("/niveles", getNiveles);
+router.get("/paises", getPaises);
 
 // Ruta para actualizar información básica del usuario
 router.put("/:id", updateUsuario);

@@ -431,6 +431,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                         .map((i, idx) => (
                           <Badge
                             key={idx}
+                            // Estilo de badge mejorado para mostrar el nivel
                             className="bg-accent/10 text-accent border-accent/20 mr-1 flex flex-col items-start gap-0.5"
                           >
                             <span className="font-semibold">{i.nombre}</span>
@@ -453,6 +454,7 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                           <Badge
                             key={idx}
                             variant="outline"
+                            // Estilo de badge mejorado para mostrar el nivel
                             className="border-primary/20 text-primary mr-1 flex flex-col items-start gap-0.5"
                           >
                             <span className="font-semibold">{i.nombre}</span>

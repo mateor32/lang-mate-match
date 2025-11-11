@@ -66,7 +66,7 @@ app.get("/api/usuarios", async (req, res) => {
         sexo: loggedUserGender,
       } = loggedUserPrefsResult.rows[0];
 
-      // 1. Consulta SQL para obtener los IDs de los usuarios recomendados - ACTUALIZADA
+      // 1. Consulta SQL para obtener los IDs de los usuarios recomendados - ACTUALIZADA CON PAÍS Y GÉNERO
       const recommendationsQuery = `
         SELECT
             u.id
@@ -74,12 +74,20 @@ app.get("/api/usuarios", async (req, res) => {
             usuarios u
         WHERE
             u.id != $1
-            -- FIX LIKES: Usar usuario1_id (swiper) y usuario2_id (swiped)
+            -- EXCLUIR LIKES: Si el logueado ya dio like, o si el otro ya dio like al logueado (aunque esto se limpia en matches)
             AND u.id NOT IN (SELECT usuario2_id FROM likes WHERE usuario1_id = $1)
             AND $1 NOT IN (SELECT usuario2_id FROM likes WHERE usuario1_id = u.id)
             
-            -- CRITERIO 1: Compatibilidad Mutua de Idiomas (Aprende/Nativo)
-            -- A Aprende (tipo 'aprender') el que B es Nativo (tipo 'nativo')
+            -- FILTRO 1: GÉNERO PREFERIDO
+            -- $2 es pref_sexo (ej: 'Hombre', 'Mujer', 'Todos'). Si es 'Todos', se ignora el filtro.
+            AND (u.sexo = $2 OR $2 = 'Todos')
+            
+            -- FILTRO 2: PAÍS PREFERIDO
+            -- $3 es pref_pais_id (un número o NULL/0). Si es NULL o 0, se ignora el filtro.
+            AND (u.pais_id = $3 OR $3 IS NULL OR $3 = 0)
+            
+            -- CRITERIO 2: Compatibilidad Mutua de Idiomas (Aprende/Nativo)
+            -- A (logueado) Aprende el que B (candidato) es Nativo
             AND EXISTS (
                 SELECT 1 FROM usuario_idioma ui_a
                 JOIN usuario_idioma ui_b ON ui_a.idioma_id = ui_b.idioma_id
@@ -88,7 +96,7 @@ app.get("/api/usuarios", async (req, res) => {
                   AND ui_b.usuario_id = u.id
                   AND ui_b.tipo = 'nativo'
             )
-            -- B Aprende (tipo 'aprender') el que A es Nativo (tipo 'nativo')
+            -- B (candidato) Aprende el que A (logueado) es Nativo
             AND EXISTS (
                 SELECT 1 FROM usuario_idioma ui_b
                 JOIN usuario_idioma ui_a ON ui_b.idioma_id = ui_a.idioma_id
@@ -98,7 +106,7 @@ app.get("/api/usuarios", async (req, res) => {
                   AND ui_a.tipo = 'nativo'
             )
 
-            -- CRITERIO 2: Intereses Comunes (Al menos uno)
+            -- CRITERIO 3: Intereses Comunes (Al menos uno)
             AND EXISTS (
                 SELECT 1 FROM usuario_interes ui_a
                 JOIN usuario_interes ui_b ON ui_a.interes_id = ui_b.interes_id
@@ -114,15 +122,14 @@ app.get("/api/usuarios", async (req, res) => {
       let recommendedIdsResult;
       let recommendedIds;
 
-      // Se usa un array de parámetros sin el valor de país ($3) en el índice,
-      // ya que la consulta ya no lo necesita.
-      const queryParams = [loggedUserId, pref_sexo, loggedUserGender];
+      // La consulta actualizada usa $1: loggedUserId, $2: pref_sexo, $3: pref_pais_id
+      const queryParams = [loggedUserId, pref_sexo, pref_pais_id]; // <-- ARRAY DE PARÁMETROS CORREGIDO
 
       try {
         // --- CRITICAL QUERY EXECUTION ---
         recommendedIdsResult = await pool.query(
           recommendationsQuery,
-          queryParams
+          queryParams // <-- Se pasan 3 parámetros
         );
         recommendedIds = recommendedIdsResult.rows.map((row) => row.id);
       } catch (sqlRecError) {

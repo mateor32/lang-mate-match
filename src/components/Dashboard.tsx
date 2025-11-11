@@ -432,12 +432,12 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                           <Badge
                             key={idx}
                             // Estilo de badge mejorado para mostrar el nivel
-                            className="bg-accent/10 text-accent border-accent/20 mr-1 flex flex-col items-start gap-0.5"
+                            className="bg-accent/10 text-accent border-accent/20 mr-1 "
                           >
                             <span className="font-semibold">{i.nombre}</span>
                             {i.nivel_nombre && (
-                              <span className="text-[0.65rem] font-normal opacity-75">
-                                {i.nivel_nombre}
+                              <span className="ml-1 text-xs font-normal opacity-75">
+                                + - {i.nivel_nombre}
                               </span>
                             )}
                           </Badge>
@@ -455,12 +455,12 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                             key={idx}
                             variant="outline"
                             // Estilo de badge mejorado para mostrar el nivel
-                            className="border-primary/20 text-primary mr-1 flex flex-col items-start gap-0.5"
+                            className="border-primary/20 text-primary mr-1"
                           >
                             <span className="font-semibold">{i.nombre}</span>
                             {i.nivel_nombre && (
-                              <span className="text-[0.65rem] font-normal opacity-75">
-                                {i.nivel_nombre}
+                              <span className="ml-1 text-xs font-normal opacity-75">
+                                + - {i.nivel_nombre}
                               </span>
                             )}
                           </Badge>

@@ -119,13 +119,38 @@ app.get("/api/usuarios", async (req, res) => {
             u.id
       `;
 
-      const recommendedIdsResult = await pool.query(recommendationsQuery, [
-        loggedUserId,
-        pref_sexo,
-        pref_pais_id,
-        loggedUserGender,
-      ]);
-      const recommendedIds = recommendedIdsResult.rows.map((row) => row.id);
+      let recommendedIdsResult;
+      let recommendedIds;
+
+      try {
+        // --- CRITICAL QUERY EXECUTION ---
+        recommendedIdsResult = await pool.query(recommendationsQuery, [
+          loggedUserId,
+          pref_sexo,
+          pref_pais_id,
+          loggedUserGender,
+        ]);
+        recommendedIds = recommendedIdsResult.rows.map((row) => row.id);
+      } catch (sqlRecError) {
+        // Explicit logging for the complex recommendation query failure
+        console.error(
+          "Error SQL en la consulta de recomendaciones:",
+          sqlRecError.message
+        );
+        console.error("Parámetros de consulta:", [
+          loggedUserId,
+          pref_sexo,
+          pref_pais_id,
+          loggedUserGender,
+        ]);
+        // Return specific error to client
+        return res
+          .status(500)
+          .json({
+            error: "Error en la lógica de recomendación SQL",
+            details: sqlRecError.message,
+          });
+      }
 
       if (recommendedIds.length === 0) {
         return res.json([]);

@@ -518,6 +518,11 @@ const Dashboard = ({ onLogout, userId }: DashboardProps) => {
                   ) : (
                     <Card className="p-8 text-center">
                       <p>No hay más usuarios disponibles 😢</p>
+                      <p>Ve a Configuración para ajustar tus preferencias </p>
+                      <p>
+                        Panel de Configuración se encuentra en la pestaña
+                        "Settings" entre premium y log out
+                      </p>
                     </Card>
                   )}
                 </>

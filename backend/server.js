@@ -318,7 +318,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 4. Intercambio de candidatos de red (ICE candidates)
+  // 4. Intercambio de candidatos de red (ICddE candidates)
   socket.on("ice-candidate", ({ toId, candidate }) => {
     const recipientSocketId = users[toId];
     if (recipientSocketId) {

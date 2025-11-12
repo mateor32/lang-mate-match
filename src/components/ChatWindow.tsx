@@ -61,6 +61,7 @@ interface ChatWindowProps {
   matchId: number; // ID del match (registro en la tabla 'matches')
   currentUserId: number; // ID del usuario logueado
   onBack: () => void;
+  currentUserNativeLang: string;
 }
 
 const ChatWindow = ({
@@ -68,6 +69,7 @@ const ChatWindow = ({
   matchId,
   currentUserId,
   onBack,
+  currentUserNativeLang, // <--- NUEVA PROP
 }: ChatWindowProps) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -281,7 +283,7 @@ const ChatWindow = ({
       callType: "video" | "audio";
     }) => {
       const accept = window.confirm(
-        `Llamada entrante de ${name} (${callType}). ¿Aceptar?`
+        `Llamada entrante  (${callType}). ¿Aceptar?`
       );
 
       if (accept) {
@@ -303,7 +305,7 @@ const ChatWindow = ({
         });
         toast({
           title: "Llamada aceptada",
-          description: `Iniciando con ${name}`,
+          description: `Iniciando `,
         });
       } else {
         // Lógica de rechazo
@@ -529,7 +531,7 @@ const ChatWindow = ({
   const partnerNativeLang =
     nativeLanguages.length > 0 ? nativeLanguages[0] : "Nativo";
 
-  const myNativeLang = "Español";
+  const myNativeLang = currentUserNativeLang;
 
   return (
     <div className="max-w-md mx-auto">

@@ -1,14 +1,14 @@
-// mateor32/lang-mate-match/mateor32-lang-mate-match-13c709073e7292ab8e58547abd2a20fbcfde7497/backend/server.js
+// mateor32/lang-mate-match/lang-mate-match-116754bcb60125a06dae58b4eba07e14418a1409/backend/server.js
 import express from "express";
 import cors from "cors";
 import pkg from "pg";
 import usuariosRouter from "./routes/usuarios.js";
 import matchRouter from "./routes/match.js";
-import messageRouter from "./routes/message.js"; // <-- NUEVO: Importa el router de mensajes
+import messageRouterFactory from "./routes/message.js"; // <-- CORREGIDO: Importa el factory
 import { googleAuth } from "./controllers/authController.js";
 import premiumRouter from "./routes/premium.js";
 import likesRouter from "./routes/likes.js";
-import { Server } from "socket.io"; // // <-- CORRECCIÓN: ajustada la capitalización para coincidir con el nombre real del fichero
+import { Server } from "socket.io";
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -32,9 +32,28 @@ const pool = new Pool({
   port: 5432,
 });*/
 
+// 🔹 Escuchar puerto después de todas las rutas
+const PORT = process.env.PORT || 5000;
+const httpServer = app.listen(PORT, () =>
+  console.log(`Servidor corriendo en puerto ${PORT}`)
+);
+
+const io = new Server(httpServer, {
+  path: "/api/socket.io/",
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+// Almacenamiento de IDs de sockets por ID de usuario (GLOBAL)
+const users = {};
+
+// MONTAJE DE RUTAS
 app.use("/api/usuarios", usuariosRouter);
 app.use("/api/matches", matchRouter(pool));
-app.use("/api/messages", messageRouter); // <-- NUEVO: Monta el router de mensajes
+// <-- CLAVE: Monta el router de mensajes usando el factory y pasando dependencias
+app.use("/api/messages", messageRouterFactory(pool, io, users));
 app.use("/api/premium", premiumRouter);
 app.use("/api/likes", likesRouter);
 app.post("/api/auth/google", googleAuth);
@@ -268,24 +287,7 @@ app.get("/api/usuario_idioma", async (req, res) => {
 
 app.use("/api/usuarios", usuariosRouter);
 
-// --- AÑADIR: Configuración y Eventos de Socket.io para la Señalización WebRTC ---
-
-// 🔹 Escuchar puerto después de todas las rutas
-const PORT = process.env.PORT || 5000;
-const httpServer = app.listen(PORT, () =>
-  console.log(`Servidor corriendo en puerto ${PORT}`)
-);
-
-const io = new Server(httpServer, {
-  path: "/api/socket.io/", // <--- CORRECCIÓN CLAVE: Path explícito
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-  },
-});
-
-// Almacenamiento de IDs de sockets por ID de usuario
-const users = {};
+// --- Configuración y Eventos de Socket.io para la Señalización WebRTC ---
 
 io.on("connection", (socket) => {
   console.log("Nuevo cliente conectado:", socket.id);
@@ -344,5 +346,3 @@ io.on("connection", (socket) => {
     }
   });
 });
-
-//app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));

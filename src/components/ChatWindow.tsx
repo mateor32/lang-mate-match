@@ -337,10 +337,39 @@ const ChatWindow = ({
       handleEndCall(false);
     };
 
+    // 💥 NUEVO: Escucha mensajes entrantes del destinatario (actualización en tiempo real)
+    const onNewMessage = (newMessage: Message) => {
+      // Solo añade el mensaje si corresponde al chat actual
+      if (newMessage.match_id === matchId) {
+        setMessages((prev) => [...prev, newMessage]);
+        scrollToBottom();
+      }
+    };
+
+    // 💥 NUEVO: Confirma que el mensaje del remitente fue guardado en la DB
+    const onMessageSentConfirmation = (
+      messageConfirmation: Message & { tempId: number }
+    ) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageConfirmation.tempId
+            ? {
+                ...msg,
+                ...messageConfirmation,
+                id: messageConfirmation.id, // Reemplaza el ID temporal por el real de la DB
+                isSending: false,
+              }
+            : msg
+        )
+      );
+      scrollToBottom();
+    };
     currentSocket.on("receive-call", onReceiveCall);
     currentSocket.on("call-accepted", onCallAccepted);
     currentSocket.on("ice-candidate", onICECandidate);
     currentSocket.on("call-ended", onCallEnded);
+    currentSocket.on("new message", onNewMessage); // <-- LISTENER DE CHAT EN TIEMPO REAL
+    currentSocket.on("message sent confirmation", onMessageSentConfirmation); // <-- LISTENER DE CONFIRMACIÓN
 
     return () => {
       // Limpieza de sockets y streams al desmontar
@@ -348,17 +377,18 @@ const ChatWindow = ({
       currentSocket.off("call-accepted", onCallAccepted);
       currentSocket.off("ice-candidate", onICECandidate);
       currentSocket.off("call-ended", onCallEnded);
+      currentSocket.off("new message", onNewMessage); // <-- LIMPIAR
+      currentSocket.off("message sent confirmation", onMessageSentConfirmation); // <-- LIMPIAR
       currentSocket.disconnect();
-      // handleEndCall(false); // La limpieza ya se hace en el handler del socket.
     };
   }, [
     currentUserId,
+    matchId, // 💥 ADD matchId to dependencies
     getLocalStream,
     setupPeerConnection,
     handleEndCall,
     user.nombre,
   ]);
-
   // Lógica para obtener mensajes de la API
   const fetchMessages = useCallback(async () => {
     if (!matchId) return;
@@ -400,9 +430,9 @@ const ChatWindow = ({
   const handleSendMessage = async () => {
     if (message.trim()) {
       const messageToSend = message.trim();
+      const tempId = Date.now();
 
       // 1. Mensaje temporal (Optimistic update)
-      const tempId = Date.now();
       const tempMessage: Message = {
         id: tempId,
         match_id: matchId,
@@ -429,13 +459,16 @@ const ChatWindow = ({
             match_id: matchId,
             sender_id: currentUserId,
             message: messageToSend,
+            recipient_id: user.id, // 💥 NUEVO: ID del destinatario para Socket.io
+            tempId: tempId, // 💥 NUEVO: ID temporal para la confirmación
           }),
         });
 
         if (!res.ok) throw new Error("Error al enviar el mensaje al backend");
 
-        // 2. Éxito: Recargar mensajes para obtener el ID real de la DB
-        await fetchMessages();
+        // 2. Si tiene éxito, no hacemos nada más, la confirmación de Socket.io
+        // (onMessageSentConfirmation) se encargará de actualizar el ID real.
+        // Se elimina la llamada a fetchMessages() para evitar un re-fetch costoso.
       } catch (error) {
         console.error("Error al enviar mensaje:", error);
         // 3. Fallo: Revertir el mensaje temporal

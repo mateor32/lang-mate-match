@@ -396,7 +396,7 @@ export default function ProfileSettings() {
                     {currentUser.nombre.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
-                <Button
+                {/* <Button
                   type="button"
                   variant="secondary"
                   size="icon"
@@ -404,7 +404,7 @@ export default function ProfileSettings() {
                   title="Subir nueva foto"
                 >
                   <Upload className="w-4 h-4" />
-                </Button>
+                </Button>*/}
               </div>
 
               <div className="flex-1 space-y-1">

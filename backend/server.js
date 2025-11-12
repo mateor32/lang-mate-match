@@ -273,7 +273,6 @@ app.get("/api/idiomas", async (req, res) => {
 
 // Ruta: traer todas las relaciones usuario-idioma
 app.get("/api/usuario_idioma", async (req, res) => {
-  // ... (código existente del endpoint /api/usuario_idioma)
   try {
     const result = await pool.query(
       "SELECT * FROM usuario_idioma ORDER BY usuario_id"

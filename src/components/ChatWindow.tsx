@@ -588,7 +588,7 @@ const ChatWindow = ({
                 >
                   <Phone className="w-4 h-4" />
                 </Button>
-                <Button
+                {/* <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => handleInitiateCall("video")}
@@ -596,7 +596,7 @@ const ChatWindow = ({
                   className="w-10 h-10 hover:bg-primary/10 text-primary"
                 >
                   <Video className="w-4 h-4" />
-                </Button>
+                </Button>*/}
               </>
             )}
 
@@ -695,9 +695,9 @@ const ChatWindow = ({
         {/* Input */}
         <div className="p-4 border-t">
           <div className="flex items-end gap-2">
-            <Button variant="ghost" size="sm" className="mb-1">
+            {/*<Button variant="ghost" size="sm" className="mb-1">
               <Paperclip className="w-4 h-4" />
-            </Button>
+            </Button>*/}
 
             <div className="flex-1 relative">
               <Input
@@ -707,13 +707,13 @@ const ChatWindow = ({
                 onKeyPress={handleKeyPress}
                 className="pr-10 resize-none rounded-full"
               />
-              <Button
+              {/*<Button
                 variant="ghost"
                 size="sm"
                 className="absolute right-1 top-1/2 transform -translate-y-1/2"
               >
                 <Smile className="w-4 h-4" />
-              </Button>
+              </Button>*/}
             </div>
 
             <Button

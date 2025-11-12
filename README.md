@@ -1,73 +1,15 @@
-# Welcome to your Lovable project
-
-## Project info
-
-**URL**: https://lovable.dev/projects/974026ca-0053-4cfe-a99a-5a4d897aadd7
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/974026ca-0053-4cfe-a99a-5a4d897aadd7) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+He aquí una versión mejorada del archivo README.md, más atractiva y detallada, especialmente en la sección de puesta en marcha local.🌍 LinguaMatch: Intercambio de Idiomas y Matching Inteligente¡Bienvenido al proyecto LinguaMatch! Esta aplicación web te conecta con compañeros de todo el mundo para practicar idiomas, utilizando un sistema de matching avanzado y comunicación en tiempo real.✨ Características DestacadasMotor de Matching: Conecta usuarios que desean aprender el idioma nativo del otro, basado en preferencias (país, género) e intereses comunes.Comunicación en Tiempo Real: Chat con actualización instantánea y funcionalidad de llamadas (audio/video) vía WebRTC y Socket.io.Perfiles Completos: Soporte para múltiples idiomas (nativos y de aprendizaje), niveles de competencia e intereses.Sistema Premium: Implementación de límites de uso y lógica de suscripciones con planes Premium.🛠️ Tecnologías ClaveEste proyecto utiliza una arquitectura moderna Full-Stack:ComponenteTecnologíasFrontend (UI)Vite, React, TypeScript, shadcn-ui, Tailwind CSSGestión de EstadoReact Query (@tanstack/react-query)Backend (API)Express.js (ESM), PostgreSQL (pg)Tiempo RealSocket.io (para chat y señalización WebRTC)AutenticaciónGoogle OAuth🚀 Puesta en Marcha (Desarrollo Local)Para configurar y ejecutar LinguaMatch en tu máquina, necesitas dos procesos separados: el backend (API) y el frontend (Vite Dev Server).1. Requisitos PreviosTener Node.js y npm instalados (se recomienda usar nvm).Tener una instancia de PostgreSQL corriendo. La configuración por defecto espera una base de datos llamada linguamatch (o revisa backend/db.js y backend/.env).2. InstalaciónClona el repositorio y descarga las dependencias:Bash# Paso 1: Clonar el repositorio y navegar al directorio
 git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Paso 2: Instalar dependencias para Frontend y Backend
+npm install 
+# El archivo package.json del proyecto raíz instala las dependencias de ambos.
+3. Iniciar ServidoresDebes iniciar el servidor de la API y el servidor de desarrollo del frontend por separado.ServicioComandoPuerto por DefectoBackend (API/Socket.io)node backend/server.js5000Frontend (Vite Dev)npm run dev8080Bash# Terminal 1: Iniciar el Backend (API)
+node backend/server.js 
+# El backend gestiona las rutas /api/* y las conexiones de Socket.io.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Terminal 2: Iniciar el Frontend (Vite)
 npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/974026ca-0053-4cfe-a99a-5a4d897aadd7) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+# Abre http://localhost:8080 en tu navegador.
+☁️ Despliegue y ContribuciónPlataforma LovableURL del Proyecto: https://lovable.dev/projects/974026ca-0053-4cfe-a99a-5a4d897aadd7Despliegue: Para publicar los cambios, simplemente visita el proyecto en Lovable y usa la opción Share -> Publish.Dominio Personalizado: Puedes conectar un dominio personalizado en Project > Settings > Domains.Contribución Directa (IDE o GitHub)Usando tu IDE: Clona este repo, haz tus cambios y haz git push. Los cambios se reflejarán automáticamente en Lovable.Usando GitHub Codespaces: Navega a la página principal del repositorio, haz clic en Code y selecciona la pestaña Codespaces para iniciar un entorno de desarrollo instantáneo.Linting: Asegúrate de pasar el linter antes de hacer push: npm run lint.
